@@ -19,7 +19,11 @@ COPY pyproject.toml uv.lock ./
 RUN --mount=type=cache,target=/root/.cache \
     uv sync --locked --no-install-project --no-dev
 
+# README.md and LICENSE are required at build time: pyproject.toml declares
+# them via `readme` and `license-files`, so the uv_build backend reads both
+# when building the package below.
 COPY src/ src/
+COPY README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache \
     uv sync --locked --no-dev
 
