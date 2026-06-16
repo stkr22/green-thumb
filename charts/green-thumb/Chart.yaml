@@ -1,0 +1,19 @@
+apiVersion: v2
+name: green-thumb
+description: A simple self-hosted plant care tracker (FastAPI + SQLite backend, React SPA frontend).
+type: application
+home: https://github.com/stkr22/green-thumb
+sources:
+  - https://github.com/stkr22/green-thumb
+maintainers:
+  - name: stkr22
+    url: https://github.com/stkr22
+keywords:
+  - plants
+  - self-hosted
+  - gardening
+# version: chart version, bumped on every chart change.
+# appVersion: the green-thumb release this chart deploys (mirrors pyproject version).
+# CI overrides both at package time from the release tag.
+version: 0.1.0
+appVersion: "0.1.0"

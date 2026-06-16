@@ -1,8 +1,8 @@
 name: Helm Chart Release
 
-# Publishes the greenthumb Helm chart as an OCI artifact to GHCR on every
+# Publishes the green-thumb Helm chart as an OCI artifact to GHCR on every
 # GitHub Release, alongside the container image (see container-build-push.yml).
-# The chart lands at oci://ghcr.io/<owner>/charts/greenthumb:<version>.
+# The chart lands at oci://ghcr.io/<owner>/charts/green-thumb:<version>.
 on:
   release:
     types: [published]
@@ -16,7 +16,7 @@ jobs:
       contents: read
 
     env:
-      CHART_DIR: charts/greenthumb
+      CHART_DIR: charts/green-thumb
       # OCI repository the chart is pushed into (chart name is appended by helm).
       OCI_REPO: oci://ghcr.io/${{ github.repository_owner }}/charts
 
@@ -47,4 +47,4 @@ jobs:
             | helm registry login ghcr.io -u "${{ github.actor }}" --password-stdin
 
       - name: Push chart
-        run: helm push "dist/greenthumb-${VERSION}.tgz" "$OCI_REPO"
+        run: helm push "dist/green-thumb-${VERSION}.tgz" "$OCI_REPO"

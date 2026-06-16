@@ -149,6 +149,10 @@ cython_debug/
 # Frontend
 frontend/node_modules/
 frontend/dist/
+*.tsbuildinfo
+# Re-include frontend source under src/lib/ (the generic `lib/` rule above is
+# meant for Python build artifacts, not application code).
+!frontend/src/lib/
 
 # Generated OpenAPI schema (regenerate with: uv run python -c "...", see docs)
 openapi.json

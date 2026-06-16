@@ -1,0 +1,22 @@
+green-thumb {{ .Chart.AppVersion }} has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Workloads:
+  backend:  {{ include "green-thumb.backend.fullname" . }} (single-instance, SQLite on {{ include "green-thumb.pvcName" . }})
+  frontend: {{ include "green-thumb.frontend.fullname" . }}
+
+{{- if not (lookup "v1" "Secret" .Release.Namespace .Values.backend.existingSecret) }}
+
+WARNING: the backend expects an existing Secret named "{{ .Values.backend.existingSecret }}"
+which was NOT found in namespace "{{ .Release.Namespace }}". The backend pod will not
+start until it exists. Create it (OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY,
+FRONTEND_URL) out-of-band, e.g. via sealed-secrets. See the chart README for the keys.
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Reach the app at: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}/
+{{- else }}
+
+Ingress is disabled. Port-forward to try it locally:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "green-thumb.frontend.fullname" . }} 8080:{{ .Values.frontend.service.port }}
+{{- end }}
