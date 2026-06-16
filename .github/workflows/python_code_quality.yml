@@ -44,8 +44,8 @@ jobs:
       - name: Install the project
         run: uv sync --all-extras --dev
 
-      - name: Run Mypy (Type Checker)
-        run: uv run mypy --pretty .
+      - name: Run ty (Type Checker)
+        run: uv run ty check
 
 
   tests:
