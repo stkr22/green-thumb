@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.1.1](https://github.com/stkr22/green-thumb/compare/v0.1.0...v0.1.1) (2026-06-16)
+
+
+### Bug Fixes
+
+* align uv version so container build reads the lockfile ([763d3a3](https://github.com/stkr22/green-thumb/commit/763d3a3818d2987d867a5fccb6ceb96d6c5d8bd6))
+* correct uv.lock extra-files jsonpath to use .value in filter ([b83c3b7](https://github.com/stkr22/green-thumb/commit/b83c3b78430179e1058244004dc434d5bd3db34d))
+* correct uv.lock extra-files jsonpath to use .value in filter ([b7a76b3](https://github.com/stkr22/green-thumb/commit/b7a76b3b90c6a81052545c818b67d94f1b213f15))
+* regenerate uv.lock for greenthumb 0.1.0 so the container build passes ([fe6f1d5](https://github.com/stkr22/green-thumb/commit/fe6f1d55a17717c55b5db0fc0ed19f1215c23633))
+
 ## 0.1.0 (2026-06-16)
 
 
