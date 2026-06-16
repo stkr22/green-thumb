@@ -20,6 +20,8 @@ jobs:
         run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_ENV
 
       - name: Install uv
+        # Version unset on purpose: setup-uv reads required-version from
+        # pyproject.toml ([tool.uv]), the single source of truth.
         uses: astral-sh/setup-uv@ed21f2f24f8dd64503750218de024bcf64c7250a # v7.1.5
 
       - name: Set up Python

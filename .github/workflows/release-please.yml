@@ -20,4 +20,6 @@ jobs:
         id: release
         with:
           token: ${{ steps.generate_token.outputs.token }}
-          release-type: python
+          # Manifest mode: config lives in release-please-config.json (which
+          # carries the release-type and the uv.lock extra-files updater) plus
+          # .release-please-manifest.json. Default paths are auto-detected.
