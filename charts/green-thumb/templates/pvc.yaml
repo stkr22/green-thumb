@@ -1,0 +1,33 @@
+{{- if and .Values.persistence.enabled (not .Values.persistence.existingClaim) }}
+# Persistent storage for the SQLite database file. ReadWriteOnce: the backend is
+# a single instance (the in-process reminder loop must not run in parallel), so
+# only one pod ever mounts this. Photos are stored inline as BLOBs; bump the size
+# if your collection grows.
+#
+# Retained on `helm uninstall` so the database survives a release teardown.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "green-thumb.pvcName" . }}
+  labels:
+    {{- include "green-thumb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+  annotations:
+    helm.sh/resource-policy: keep
+    {{- with .Values.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    - {{ .Values.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  {{- if .Values.persistence.storageClass }}
+  {{- if eq "-" .Values.persistence.storageClass }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,117 @@
+# Default values for the green-thumb chart.
+#
+# green-thumb runs as two workloads behind one Ingress: a single-instance FastAPI
+# backend (SQLite on a ReadWriteOnce PVC + an in-process reminder loop, so it
+# must never scale past one replica) and a stateless React SPA served by nginx.
+
+nameOverride: ""
+fullnameOverride: ""
+
+# -- Image registry pull secrets, applied to both workloads.
+imagePullSecrets: []
+
+backend:
+  image:
+    repository: ghcr.io/stkr22/green-thumb
+    pullPolicy: IfNotPresent
+    # Defaults to the chart appVersion when empty.
+    tag: ""
+
+  # SQLAlchemy URL. Four leading slashes => absolute path on the mounted PVC.
+  databaseUrl: sqlite+aiosqlite:////data/greenthumb.db
+
+  # Name of an existing Opaque Secret holding the runtime config the backend
+  # reads via envFrom: OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY,
+  # FRONTEND_URL. Created out-of-band (sealed-secrets/SOPS); see the chart README.
+  existingSecret: green-thumb-backend
+
+  # Run `alembic upgrade head` in an init container before the app starts.
+  migrations:
+    enabled: true
+
+  # fsGroup makes the PVC group-writable by the image's appuser (gid 1001) so the
+  # non-root process can create the SQLite file.
+  podSecurityContext:
+    fsGroup: 1001
+
+  service:
+    type: ClusterIP
+    port: 8000
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+  livenessProbe:
+    httpGet:
+      path: /healthz
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readinessProbe:
+    httpGet:
+      path: /readyz
+      port: http
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+frontend:
+  image:
+    repository: ghcr.io/stkr22/green-thumb-frontend
+    pullPolicy: IfNotPresent
+    tag: ""
+
+  replicaCount: 1
+
+  service:
+    type: ClusterIP
+    port: 80
+
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 64Mi
+
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# Persistent storage for the SQLite database. Single-instance backend => RWO.
+persistence:
+  enabled: true
+  # Bind to a pre-existing PVC instead of letting the chart create one. When set,
+  # size/accessMode/storageClass below are ignored.
+  existingClaim: ""
+  accessMode: ReadWriteOnce
+  size: 5Gi
+  # "" uses the cluster default StorageClass; "-" disables dynamic provisioning.
+  storageClass: ""
+  annotations: {}
+
+# Single hostname, path-based routing: /api and /auth -> backend, / -> frontend.
+# Same origin, so no CORS handling is needed.
+ingress:
+  enabled: true
+  className: traefik
+  host: plants.example.com
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: websecure
+  tls:
+    enabled: false
+    secretName: green-thumb-tls

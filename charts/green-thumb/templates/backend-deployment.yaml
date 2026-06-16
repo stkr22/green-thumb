@@ -1,0 +1,92 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "green-thumb.backend.fullname" . }}
+  labels:
+    {{- include "green-thumb.labels" . | nindent 4 }}
+    app.kubernetes.io/component: backend
+spec:
+  # Pinned to one replica: the SQLite file lives on a ReadWriteOnce volume that
+  # only one pod can mount, and the in-process reminder loop must stay singleton.
+  replicas: 1
+  strategy:
+    # Recreate tears the old pod down before starting the new one so the RWO
+    # volume is never double-mounted (brief downtime on deploy).
+    type: Recreate
+  selector:
+    matchLabels:
+      {{- include "green-thumb.backend.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "green-thumb.backend.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.backend.podSecurityContext | nindent 8 }}
+      {{- if .Values.backend.migrations.enabled }}
+      initContainers:
+        # Apply migrations before the app starts; shares the same volume and pod.
+        - name: migrate
+          image: {{ include "green-thumb.image" (dict "image" .Values.backend.image "root" .) }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.backend.databaseUrl | quote }}
+            # Settings validation requires a session key even for migrations.
+            - name: SESSION_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.backend.existingSecret }}
+                  key: SESSION_SECRET_KEY
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      {{- end }}
+      containers:
+        - name: backend
+          image: {{ include "green-thumb.image" (dict "image" .Values.backend.image "root" .) }}
+          imagePullPolicy: {{ .Values.backend.image.pullPolicy }}
+          ports:
+            - containerPort: 8000
+              name: http
+          env:
+            - name: DATABASE_URL
+              value: {{ .Values.backend.databaseUrl | quote }}
+          envFrom:
+            # OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY, FRONTEND_URL.
+            - secretRef:
+                name: {{ .Values.backend.existingSecret }}
+          {{- with .Values.backend.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.backend.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          resources:
+            {{- toYaml .Values.backend.resources | nindent 12 }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "green-thumb.pvcName" . }}
+      {{- with .Values.backend.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.backend.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
