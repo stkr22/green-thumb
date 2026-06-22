@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.0](https://github.com/stkr22/green-thumb/compare/v0.1.1...v0.2.0) (2026-06-22)
+
+
+### Features
+
+* remove FloraCodex integration ([6c03e85](https://github.com/stkr22/green-thumb/commit/6c03e85806b1958bd0306f81c4baa90e383aa717))
+* remove FloraCodex integration ([bb4cbaa](https://github.com/stkr22/green-thumb/commit/bb4cbaab61d4c5bd4742a0ed27db3cef7c11723a))
+
 ## [0.1.1](https://github.com/stkr22/green-thumb/compare/v0.1.0...v0.1.1) (2026-06-16)
 
 
