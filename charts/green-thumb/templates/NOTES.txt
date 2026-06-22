@@ -1,8 +1,7 @@
 green-thumb {{ .Chart.AppVersion }} has been deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
 
-Workloads:
-  backend:  {{ include "green-thumb.backend.fullname" . }} (single-instance, SQLite on {{ include "green-thumb.pvcName" . }})
-  frontend: {{ include "green-thumb.frontend.fullname" . }}
+Workload:
+  {{ include "green-thumb.backend.fullname" . }} (single-instance; serves the API + SPA, SQLite on {{ include "green-thumb.pvcName" . }})
 
 {{- if not (lookup "v1" "Secret" .Release.Namespace .Values.backend.existingSecret) }}
 
@@ -18,5 +17,5 @@ Reach the app at: http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Value
 {{- else }}
 
 Ingress is disabled. Port-forward to try it locally:
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "green-thumb.frontend.fullname" . }} 8080:{{ .Values.frontend.service.port }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "green-thumb.backend.fullname" . }} 8080:{{ .Values.backend.service.port }}
 {{- end }}

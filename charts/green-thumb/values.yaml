@@ -1,13 +1,13 @@
 # Default values for the green-thumb chart.
 #
-# green-thumb runs as two workloads behind one Ingress: a single-instance FastAPI
-# backend (SQLite on a ReadWriteOnce PVC + an in-process reminder loop, so it
-# must never scale past one replica) and a stateless React SPA served by nginx.
+# green-thumb runs as one workload: a single-instance FastAPI backend that serves
+# both the API and the built React SPA (SQLite on a ReadWriteOnce PVC + an
+# in-process reminder loop, so it must never scale past one replica).
 
 nameOverride: ""
 fullnameOverride: ""
 
-# -- Image registry pull secrets, applied to both workloads.
+# -- Image registry pull secrets.
 imagePullSecrets: []
 
 backend:
@@ -63,35 +63,6 @@ backend:
   tolerations: []
   affinity: {}
 
-frontend:
-  image:
-    repository: ghcr.io/stkr22/green-thumb-frontend
-    pullPolicy: IfNotPresent
-    tag: ""
-
-  replicaCount: 1
-
-  service:
-    type: ClusterIP
-    port: 80
-
-  resources:
-    requests:
-      cpu: 10m
-      memory: 32Mi
-    limits:
-      cpu: 100m
-      memory: 64Mi
-
-  readinessProbe:
-    httpGet:
-      path: /
-      port: http
-
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
 # Persistent storage for the SQLite database. Single-instance backend => RWO.
 persistence:
   enabled: true
@@ -104,8 +75,7 @@ persistence:
   storageClass: ""
   annotations: {}
 
-# Single hostname, path-based routing: /api and /auth -> backend, / -> frontend.
-# Same origin, so no CORS handling is needed.
+# Single hostname routed entirely to the backend (which serves the API and SPA).
 ingress:
   enabled: true
   className: traefik

@@ -55,17 +55,6 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 app.kubernetes.io/component: backend
 {{- end -}}
 
-{{- define "green-thumb.frontend.fullname" -}}
-{{- printf "%s-frontend" (include "green-thumb.fullname" .) -}}
-{{- end -}}
-
-{{- define "green-thumb.frontend.selectorLabels" -}}
-app: {{ include "green-thumb.frontend.fullname" . }}
-app.kubernetes.io/name: {{ include "green-thumb.name" . }}
-app.kubernetes.io/instance: {{ .Release.Name }}
-app.kubernetes.io/component: frontend
-{{- end -}}
-
 {{/*
 PVC name: the existing claim if provided, otherwise the chart-managed one.
 */}}

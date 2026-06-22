@@ -17,3 +17,7 @@ coverage.xml
 .pytest_cache/
 .env
 .venv
+
+# Node: installed in-image by `npm ci`; never copy the host's copy or build output.
+**/node_modules
+frontend/dist

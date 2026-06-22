@@ -2,7 +2,7 @@
 
 Deploys [green-thumb](https://github.com/stkr22/green-thumb), a self-hosted plant
 care tracker: a single-instance FastAPI backend (SQLite on a PVC + an in-process
-reminder loop) and a stateless React SPA, behind one Ingress.
+reminder loop) that also serves the built React SPA, behind one Ingress.
 
 ## Install
 
@@ -17,8 +17,8 @@ helm install green-thumb oci://ghcr.io/stkr22/charts/green-thumb \
 ```
 
 > Use release name `green-thumb` so the generated object names stay
-> `green-thumb-backend` / `green-thumb-frontend` (a different release name prefixes
-> them; internal references still resolve either way).
+> `green-thumb-backend` (a different release name prefixes them; internal
+> references still resolve either way).
 
 ## Backend secret
 
@@ -50,7 +50,6 @@ validation runs in the migration init container).
 | `backend.databaseUrl` | `sqlite+aiosqlite:////data/greenthumb.db` | SQLAlchemy URL (absolute path on the PVC). |
 | `backend.existingSecret` | `green-thumb-backend` | Secret consumed via `envFrom`. |
 | `backend.migrations.enabled` | `true` | Run `alembic upgrade head` in an init container. |
-| `frontend.image.repository` | `ghcr.io/stkr22/green-thumb-frontend` | Frontend image. |
 | `persistence.enabled` | `true` | Create the SQLite PVC. |
 | `persistence.existingClaim` | `""` | Use a pre-existing PVC instead of creating one. |
 | `persistence.size` | `5Gi` | PVC size (photos are stored inline as BLOBs). |
