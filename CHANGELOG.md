@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.0](https://github.com/stkr22/green-thumb/compare/v0.2.0...v0.3.0) (2026-06-22)
+
+
+### Features
+
+* serve the SPA from the backend, drop the frontend workload ([ac11c9e](https://github.com/stkr22/green-thumb/commit/ac11c9ec92381803753fc0ba04d4556ecbe75a76))
+* serve the SPA from the backend, drop the frontend workload ([382e27b](https://github.com/stkr22/green-thumb/commit/382e27bb325e0c5bc45e8bab9e7fbc0bddcf100a))
+
 ## [0.2.0](https://github.com/stkr22/green-thumb/compare/v0.1.1...v0.2.0) (2026-06-22)
 
 
