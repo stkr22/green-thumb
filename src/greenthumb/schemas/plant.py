@@ -2,7 +2,6 @@
 
 import uuid
 from datetime import datetime
-from typing import Any
 
 from sqlmodel import Field, SQLModel
 
@@ -16,7 +15,6 @@ class PlantCreate(SQLModel):
     location_id: uuid.UUID | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
-    floracodex_pid: str | None = None
 
 
 class PlantUpdate(SQLModel):
@@ -28,8 +26,6 @@ class PlantUpdate(SQLModel):
     location_id: uuid.UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
-    floracodex_pid: str | None = None
-    floracodex_data: dict[str, Any] | None = None
 
 
 class PlantRead(SQLModel):
@@ -43,8 +39,6 @@ class PlantRead(SQLModel):
     notes: str | None
     tags: list[str]
     cover_photo_id: uuid.UUID | None
-    floracodex_pid: str | None
-    floracodex_data: dict[str, Any] | None
     created_by: uuid.UUID
     created_at: datetime
     updated_at: datetime

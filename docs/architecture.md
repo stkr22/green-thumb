@@ -26,7 +26,7 @@ there is no CORS configuration.
                       └───────────────────────────────────────────────────────┘
                                    │                         │
                                    ▼                         ▼
-                            SQLite file (PVC)          Zitadel / ntfy / FloraCodex
+                            SQLite file (PVC)          Zitadel / ntfy
 ```
 
 ## Why SQLite / single-instance
@@ -48,16 +48,14 @@ process and the database to a networked store.
 - `config.py` — pydantic-settings configuration; all values from the environment.
 - `db.py` — lazy async engine + request-scoped session dependency. Sets SQLite
   `foreign_keys`, `journal_mode=WAL`, and `busy_timeout` pragmas on connect.
-- `models/` — SQLModel table models. Column types carry PostgreSQL variants
-  (`ARRAY`, `JSONB`) that resolve to `JSON` on SQLite, a remnant of the original
-  Postgres design that keeps the models portable. Datetimes are normalised with
-  `models.base.ensure_utc`.
+- `models/` — SQLModel table models. Tag lists and free-form dicts are `JSON`
+  columns; datetimes are normalised with `models.base.ensure_utc`.
 - `schemas/` — Pydantic/SQLModel request & response models.
 - `auth/` — OIDC client, signed-cookie sessions, and the `get_current_user`
   dependency.
 - `api/v1/` — one router module per domain; handlers stay thin.
-- `services/` — business logic: `ntfy`, `floracodex`, care-log queries (`care`),
-  and `reminder_evaluator`.
+- `services/` — business logic: `ntfy`, care-log queries (`care`), and
+  `reminder_evaluator`.
 - `main.py` — app wiring, `/healthz` & `/readyz`, and the reminder loop started
   in the lifespan handler.
 
@@ -132,8 +130,7 @@ Six tables, all with UUID primary keys and UTC timestamps:
 - **locations** — `name`, `description`, `created_by` → users.
 - **plants** — `name`, `species_name`, `scientific_name`, `location_id` →
   locations (`SET NULL` on delete), `notes`, `tags` (string list),
-  `cover_photo_id` → plant_photos (`SET NULL`), `floracodex_pid`/`floracodex_data`,
-  `created_by`, timestamps.
+  `cover_photo_id` → plant_photos (`SET NULL`), `created_by`, timestamps.
 - **plant_photos** — `plant_id` → plants (`CASCADE`), `data` (display BLOB),
   `thumbnail` (BLOB), `mime_type`, `uploaded_by`.
 - **care_logs** — `plant_id` → plants (`CASCADE`), `event_type`, `notes`,
@@ -197,7 +194,6 @@ All `/api/v1/*` and `/auth/me` routes require a valid session cookie.
 | Method | Path | Purpose |
 | --- | --- | --- |
 | GET | `/dashboard` | Overdue/upcoming reminders, recent care, counts (`?upcoming_days=`) |
-| GET | `/species/search` | FloraCodex proxy (`?q=`) |
 | POST | `/notifications/test` | Send a test ntfy notification |
 | GET | `/healthz`, `/readyz` | Liveness / readiness |
 

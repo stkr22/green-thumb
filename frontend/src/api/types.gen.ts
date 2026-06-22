@@ -175,7 +175,7 @@ export interface paths {
         put?: never;
         /**
          * Create Plant
-         * @description Create a plant; species thresholds are fetched from FloraCodex when a pid is given.
+         * @description Create a plant.
          */
         post: operations["create_plant_api_v1_plants_post"];
         delete?: never;
@@ -412,26 +412,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/species/search": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Search Species
-         * @description Proxy a species search to FloraCodex; empty when no API key is configured.
-         */
-        get: operations["search_species_api_v1_species_search_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/notifications/test": {
         parameters: {
             query?: never;
@@ -635,8 +615,6 @@ export interface components {
             notes?: string | null;
             /** Tags */
             tags?: string[];
-            /** Floracodex Pid */
-            floracodex_pid?: string | null;
         };
         /**
          * PlantDetail
@@ -662,12 +640,6 @@ export interface components {
             tags: string[];
             /** Cover Photo Id */
             cover_photo_id: string | null;
-            /** Floracodex Pid */
-            floracodex_pid: string | null;
-            /** Floracodex Data */
-            floracodex_data: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Created By
              * Format: uuid
@@ -712,12 +684,6 @@ export interface components {
             tags: string[];
             /** Cover Photo Id */
             cover_photo_id: string | null;
-            /** Floracodex Pid */
-            floracodex_pid: string | null;
-            /** Floracodex Data */
-            floracodex_data: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Created By
              * Format: uuid
@@ -760,12 +726,6 @@ export interface components {
             tags: string[];
             /** Cover Photo Id */
             cover_photo_id: string | null;
-            /** Floracodex Pid */
-            floracodex_pid: string | null;
-            /** Floracodex Data */
-            floracodex_data: {
-                [key: string]: unknown;
-            } | null;
             /**
              * Created By
              * Format: uuid
@@ -799,12 +759,6 @@ export interface components {
             notes?: string | null;
             /** Tags */
             tags?: string[] | null;
-            /** Floracodex Pid */
-            floracodex_pid?: string | null;
-            /** Floracodex Data */
-            floracodex_data?: {
-                [key: string]: unknown;
-            } | null;
         };
         /**
          * RecentCare
@@ -914,20 +868,6 @@ export interface components {
             interval_days?: number | null;
             /** Enabled */
             enabled?: boolean | null;
-        };
-        /**
-         * SpeciesSearchResult
-         * @description A species hit from FloraCodex, trimmed to what the autocomplete needs.
-         */
-        SpeciesSearchResult: {
-            /** Pid */
-            pid: string;
-            /** Name */
-            name: string;
-            /** Scientific Name */
-            scientific_name?: string | null;
-            /** Image Url */
-            image_url?: string | null;
         };
         /**
          * UserRead
@@ -1835,37 +1775,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
-    };
-    search_species_api_v1_species_search_get: {
-        parameters: {
-            query: {
-                q: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SpeciesSearchResult"][];
                 };
             };
             /** @description Validation Error */

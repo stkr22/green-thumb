@@ -105,8 +105,7 @@ for the full values reference.
      --from-literal=FRONTEND_URL=https://plants.example.com \
      --from-literal=NTFY_URL=https://ntfy.example.com \
      --from-literal=NTFY_TOPIC=greenthumb \
-     --from-literal=NTFY_TOKEN=... \
-     --from-literal=FLORACODEX_API_KEY=...
+     --from-literal=NTFY_TOKEN=...
    ```
    For GitOps, manage this with sealed-secrets or SOPS instead of `kubectl create`.
 2. **Install the chart** — directly with Helm:

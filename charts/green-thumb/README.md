@@ -36,8 +36,7 @@ kubectl -n green-thumb create secret generic green-thumb-backend \
   --from-literal=FRONTEND_URL=https://plants.example.com \
   --from-literal=NTFY_URL=https://ntfy.example.com \
   --from-literal=NTFY_TOPIC=greenthumb \
-  --from-literal=NTFY_TOKEN=... \
-  --from-literal=FLORACODEX_API_KEY=...
+  --from-literal=NTFY_TOKEN=...
 ```
 
 `SESSION_SECRET_KEY` must be present even with migrations enabled (settings

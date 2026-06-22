@@ -22,7 +22,6 @@ with SSO login through [Zitadel](https://zitadel.com).
 - **Calendar** — monthly view of upcoming care
 - **Photos** — gallery per plant, with a selectable cover photo
 - **Push notifications** via ntfy, with a per-user topic override
-- **Optional species lookup** via FloraCodex (autocomplete when adding a plant)
 - **SSO login** through Zitadel (OIDC); no passwords stored by the app
 
 > **Single shared household instance.** Every signed-in user sees and can edit
@@ -54,7 +53,7 @@ Full documentation lives in [docs/](docs/):
 | --- | --- | --- |
 | [user-guide.md](docs/user-guide.md) | Everyday users | Signing in, managing plants/locations, logging care, reminders, calendar, notifications |
 | [setup.md](docs/setup.md) | Operators deploying it | Local development, docker-compose, Kubernetes/ArgoCD, building images |
-| [administration.md](docs/administration.md) | Operators running it | Configuration reference, Zitadel/ntfy/FloraCodex setup, backups, migrations, monitoring, security, troubleshooting |
+| [administration.md](docs/administration.md) | Operators running it | Configuration reference, Zitadel/ntfy setup, backups, migrations, monitoring, security, troubleshooting |
 | [architecture.md](docs/architecture.md) | Developers & curious operators | Tech stack, auth flow, reminder engine, data model, API reference |
 | [development.md](docs/development.md) | Contributors | Running locally, tests, e2e, regenerating API types, conventions |
 

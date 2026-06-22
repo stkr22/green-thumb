@@ -8,8 +8,8 @@ Workloads:
 
 WARNING: the backend expects an existing Secret named "{{ .Values.backend.existingSecret }}"
 which was NOT found in namespace "{{ .Release.Namespace }}". The backend pod will not
-start until it exists. Create it (OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY,
-FRONTEND_URL) out-of-band, e.g. via sealed-secrets. See the chart README for the keys.
+start until it exists. Create it (OIDC_*, SESSION_SECRET_KEY, NTFY_*, FRONTEND_URL)
+out-of-band, e.g. via sealed-secrets. See the chart README for the keys.
 {{- end }}
 
 {{- if .Values.ingress.enabled }}

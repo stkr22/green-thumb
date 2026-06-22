@@ -48,10 +48,7 @@ Each location shows how many plants it currently holds.
 Click **+ Add plant** on the Plants page. Fields:
 
 - **Name** (required) — your name for the plant, e.g. "Kitchen Monstera".
-- **Species** — start typing to search [FloraCodex](administration.md#floracodex-species-lookup-optional);
-  pick a match to auto-fill the species and scientific name, or just type freely.
-  (If species lookup isn't configured, the search returns nothing and you can
-  still type a name manually.)
+- **Species** — free text, e.g. "Monstera".
 - **Scientific name** — e.g. *Monstera deliciosa*.
 - **Location** — choose an existing location, or leave as "No location".
 - **Tags** — comma-separated, e.g. `tropical, low-light`. Used for filtering.

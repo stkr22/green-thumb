@@ -10,7 +10,7 @@ from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Location, Plant, PlantPhoto
 from greenthumb.models.base import utcnow
 from greenthumb.schemas import CoverPhotoUpdate, PlantCreate, PlantDetail, PlantListItem, PlantRead, PlantUpdate
-from greenthumb.services import care, floracodex
+from greenthumb.services import care
 
 router = APIRouter(prefix="/plants", tags=["plants"])
 
@@ -53,11 +53,9 @@ async def list_plants(
 
 @router.post("", response_model=PlantRead, status_code=status.HTTP_201_CREATED)
 async def create_plant(payload: PlantCreate, session: SessionDep, user: CurrentUser) -> Plant:
-    """Create a plant; species thresholds are fetched from FloraCodex when a pid is given."""
+    """Create a plant."""
     await _validate_location(session, payload.location_id)
     plant = Plant(**payload.model_dump(), created_by=user.id)
-    if plant.floracodex_pid:
-        plant.floracodex_data = await floracodex.fetch_species_detail(plant.floracodex_pid)
     session.add(plant)
     await session.commit()
     await session.refresh(plant)
@@ -79,11 +77,8 @@ async def update_plant(plant_id: uuid.UUID, payload: PlantUpdate, session: Sessi
     updates = payload.model_dump(exclude_unset=True)
     if "location_id" in updates:
         await _validate_location(session, updates["location_id"])
-    pid_changed = "floracodex_pid" in updates and updates["floracodex_pid"] != plant.floracodex_pid
     for field, value in updates.items():
         setattr(plant, field, value)
-    if pid_changed and plant.floracodex_pid and "floracodex_data" not in updates:
-        plant.floracodex_data = await floracodex.fetch_species_detail(plant.floracodex_pid)
     plant.updated_at = utcnow()
     session.add(plant)
     await session.commit()
