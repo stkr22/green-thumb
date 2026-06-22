@@ -1,9 +1,8 @@
 """Initial schema: users, locations, plants, plant_photos, care_logs, reminders.
 
-Column types reuse the SQLModel definitions (models.base) so the migration and
-the ORM stay in lockstep across dialects. The plants.cover_photo_id foreign key
-is declared inline (not via ALTER TABLE) because SQLite cannot add a constraint
-after the fact; SQLite permits a foreign key whose parent table is created later.
+The plants.cover_photo_id foreign key is declared inline (not via ALTER TABLE)
+because SQLite cannot add a constraint after the fact; SQLite permits a foreign
+key whose parent table is created later.
 
 Revision ID: 0001_initial
 Revises:
@@ -15,7 +14,7 @@ from collections.abc import Sequence
 import sqlalchemy as sa
 
 from alembic import op
-from greenthumb.models.base import json_dict_type, string_array_type, utc_datetime_type
+from greenthumb.models.base import utc_datetime_type
 
 revision: str = "0001_initial"
 down_revision: str | None = None
@@ -57,10 +56,10 @@ def upgrade() -> None:
         sa.Column("scientific_name", sa.String(), nullable=True),
         sa.Column("location_id", sa.Uuid(), nullable=True),
         sa.Column("notes", sa.String(), nullable=True),
-        sa.Column("tags", string_array_type(), nullable=False),
+        sa.Column("tags", sa.JSON(), nullable=False),
         sa.Column("cover_photo_id", sa.Uuid(), nullable=True),
         sa.Column("floracodex_pid", sa.String(), nullable=True),
-        sa.Column("floracodex_data", json_dict_type(), nullable=True),
+        sa.Column("floracodex_data", sa.JSON(), nullable=True),
         sa.Column("created_by", sa.Uuid(), nullable=False),
         sa.Column("created_at", utc_datetime_type(), nullable=False),
         sa.Column("updated_at", utc_datetime_type(), nullable=False),

@@ -1,13 +1,12 @@
 // Shared create/edit plant form (React Hook Form + Zod). Tags are entered as a
 // comma-separated string and converted on submit.
 
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 
 import { useLocations } from '../api/hooks/useLocations';
 import type { PlantCreate, PlantDetail } from '../api/types';
-import { SpeciesAutocomplete } from './SpeciesAutocomplete';
 
 const plantFormSchema = z.object({
   name: z.string().min(1, 'Name is required').max(200),
@@ -16,7 +15,6 @@ const plantFormSchema = z.object({
   location_id: z.string(),
   notes: z.string(),
   tags: z.string(),
-  floracodex_pid: z.string(),
 });
 
 type PlantFormValues = z.infer<typeof plantFormSchema>;
@@ -32,7 +30,6 @@ export function toPlantPayload(values: PlantFormValues): PlantCreate {
       .split(',')
       .map((tag) => tag.trim())
       .filter(Boolean),
-    floracodex_pid: values.floracodex_pid || null,
   };
 }
 
@@ -54,7 +51,6 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
       location_id: initial?.location_id ?? '',
       notes: initial?.notes ?? '',
       tags: initial?.tags.join(', ') ?? '',
-      floracodex_pid: initial?.floracodex_pid ?? '',
     },
   });
 
@@ -73,25 +69,7 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
 
       <div>
         <label className="mb-1 block text-sm font-medium">Species</label>
-        <Controller
-          control={form.control}
-          name="species_name"
-          render={({ field }) => (
-            <SpeciesAutocomplete
-              value={field.value}
-              onChange={(speciesName) => {
-                field.onChange(speciesName);
-                // Manual edits invalidate a previously selected FloraCodex hit.
-                form.setValue('floracodex_pid', '');
-              }}
-              onSelect={(species) => {
-                field.onChange(species.name);
-                form.setValue('scientific_name', species.scientific_name ?? '');
-                form.setValue('floracodex_pid', species.pid);
-              }}
-            />
-          )}
-        />
+        <input className="input-base" placeholder="Monstera" {...form.register('species_name')} />
       </div>
 
       <div>

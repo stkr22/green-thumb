@@ -58,7 +58,7 @@ spec:
             - name: DATABASE_URL
               value: {{ .Values.backend.databaseUrl | quote }}
           envFrom:
-            # OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY, FRONTEND_URL.
+            # OIDC_*, SESSION_SECRET_KEY, NTFY_*, FRONTEND_URL.
             - secretRef:
                 name: {{ .Values.backend.existingSecret }}
           {{- with .Values.backend.livenessProbe }}

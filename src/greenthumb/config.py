@@ -43,9 +43,6 @@ class Settings(BaseSettings):
     NTFY_TOPIC: str = "greenthumb"
     NTFY_TOKEN: str | None = None
 
-    FLORACODEX_API_KEY: str | None = None
-    FLORACODEX_BASE_URL: str = "https://api.floracodex.com"
-
     FRONTEND_URL: str = "http://localhost:5173"
 
     # How often the background loop evaluates reminders. One hour is plenty for

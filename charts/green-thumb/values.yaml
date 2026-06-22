@@ -21,8 +21,8 @@ backend:
   databaseUrl: sqlite+aiosqlite:////data/greenthumb.db
 
   # Name of an existing Opaque Secret holding the runtime config the backend
-  # reads via envFrom: OIDC_*, SESSION_SECRET_KEY, NTFY_*, FLORACODEX_API_KEY,
-  # FRONTEND_URL. Created out-of-band (sealed-secrets/SOPS); see the chart README.
+  # reads via envFrom: OIDC_*, SESSION_SECRET_KEY, NTFY_*, FRONTEND_URL.
+  # Created out-of-band (sealed-secrets/SOPS); see the chart README.
   existingSecret: green-thumb-backend
 
   # Run `alembic upgrade head` in an init container before the app starts.

@@ -25,8 +25,6 @@ or `.env.local`.
 | `NTFY_URL` | no | — | ntfy server URL; notifications are skipped if unset |
 | `NTFY_TOPIC` | no | `greenthumb` | Default notification topic |
 | `NTFY_TOKEN` | no | — | ntfy bearer access token (see [ntfy](#ntfy-push-notifications)) |
-| `FLORACODEX_API_KEY` | no | — | Enables species autocomplete; degrades gracefully if unset |
-| `FLORACODEX_BASE_URL` | no | `https://api.floracodex.com` | FloraCodex API base |
 | `REMINDER_CHECK_INTERVAL_SECONDS` | no | `3600` | How often the reminder loop runs (min 60) |
 | `LOG_LEVEL` | no | `INFO` | Python log level |
 | `DEV_AUTH_BYPASS` | no | `false` | **Local only.** Enables `GET /auth/dev-login`; see [below](#dev-login-bypass-local-only) |
@@ -102,13 +100,6 @@ a down ntfy server won't break care logging or the reminder loop. Users can
 verify their own setup with **Send test notification** on the Profile page;
 operators can check the server config the same way (it returns `502` if ntfy
 rejects the publish).
-
-## FloraCodex species lookup (optional)
-
-Set `FLORACODEX_API_KEY` to enable species autocomplete when adding/editing a
-plant, and to store ideal-condition data on the plant. Without a key, the
-species search returns an empty list and users type species names manually —
-nothing else is affected.
 
 ## Database & backups
 
@@ -212,6 +203,5 @@ covered by tests (`tests/test_dev_login.py`) to ensure it stays inert by default
 | Login fails, log shows `ID token validation failed` | Issuer/audience/nonce mismatch — confirm `OIDC_ISSUER_URL` and that `OIDC_CLIENT_ID` is in the token audience. |
 | Endless redirect to login after signing in | Session cookie not being stored. Over HTTP set `SESSION_COOKIE_SECURE=false`; ensure the browser reaches the app on the same origin as `FRONTEND_URL`. |
 | Test notification returns `502` | ntfy rejected the publish — check `NTFY_URL`, `NTFY_TOKEN`, and that the topic is writable. |
-| Species search always empty | `FLORACODEX_API_KEY` not set (this is graceful degradation, not an error). |
 | `readyz` failing | The database file/volume isn't writable or reachable; check the PVC and `fsGroup`. |
 | Deploy hangs / `Multi-Attach` error on the PVC | The volume is `ReadWriteOnce`; ensure the old pod is gone (the `Recreate` strategy handles this — don't switch to `RollingUpdate`). |

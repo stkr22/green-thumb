@@ -1,4 +1,4 @@
-"""Health, species search, and notification trigger tests."""
+"""Health and notification trigger tests."""
 
 import httpx
 import pytest
@@ -10,18 +10,6 @@ async def test_healthz(anon_client: httpx.AsyncClient):
     response = await anon_client.get("/healthz")
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
-
-
-async def test_species_search_without_api_key_returns_empty(client: httpx.AsyncClient):
-    # FLORACODEX_API_KEY is unset in tests: graceful degradation per spec.
-    response = await client.get("/api/v1/species/search", params={"q": "monstera"})
-    assert response.status_code == 200
-    assert response.json() == []
-
-
-async def test_species_search_requires_auth(anon_client: httpx.AsyncClient):
-    response = await anon_client.get("/api/v1/species/search", params={"q": "monstera"})
-    assert response.status_code == 401
 
 
 async def test_notification_test_endpoint_success(client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch):

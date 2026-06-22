@@ -13,14 +13,7 @@ from greenthumb.config import get_settings
 logger = logging.getLogger(__name__)
 
 
-async def send_notification(
-    *,
-    title: str,
-    message: str,
-    topic: str | None = None,
-    priority: int = 3,
-    tags: list[str] | None = None,
-) -> bool:
+async def send_notification(*, title: str, message: str, topic: str | None = None) -> bool:
     """Publish a notification; returns True when ntfy accepted it."""
     settings = get_settings()
     if not settings.NTFY_URL:
@@ -30,8 +23,8 @@ async def send_notification(
         "topic": topic or settings.NTFY_TOPIC,
         "title": title,
         "message": message,
-        "priority": priority,
-        "tags": tags or ["seedling"],
+        "priority": 3,
+        "tags": ["seedling"],
     }
     headers = {}
     if settings.NTFY_TOKEN:
