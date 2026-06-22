@@ -45,6 +45,10 @@ class Settings(BaseSettings):
 
     FRONTEND_URL: str = "http://localhost:5173"
 
+    # Directory of the built SPA to serve at /. Empty disables it (local dev runs
+    # the Vite dev server instead); the production image sets it to /app/static.
+    STATIC_DIR: str = ""
+
     # How often the background loop evaluates reminders. One hour is plenty for
     # day-granularity intervals while keeping ntfy traffic low.
     REMINDER_CHECK_INTERVAL_SECONDS: int = Field(default=3600, ge=60)

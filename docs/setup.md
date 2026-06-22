@@ -78,11 +78,10 @@ must not run in parallel — see
 
 | Template | Purpose |
 | --- | --- |
-| `backend-deployment.yaml` | Single replica, `Recreate`, `fsGroup: 1001`, migration `initContainer`, `/healthz` + `/readyz` probes |
+| `backend-deployment.yaml` | Single replica, `Recreate`, `fsGroup: 1001`, migration `initContainer`, `/healthz` + `/readyz` probes; serves the API and the built SPA |
 | `backend-service.yaml` | Backend ClusterIP service |
-| `frontend-deployment.yaml` + `frontend-service.yaml` | nginx serving the built SPA |
 | `pvc.yaml` | `ReadWriteOnce` volume for the SQLite file (kept on uninstall) |
-| `ingress.yaml` | Traefik path routing on one hostname |
+| `ingress.yaml` | Traefik routing on one hostname |
 
 The namespace and the `green-thumb-backend` secret are **not** part of the chart:
 the namespace is created by the install (`--create-namespace` /
@@ -115,8 +114,8 @@ for the full values reference.
      --namespace green-thumb --create-namespace \
      --set ingress.host=plants.example.com
    ```
-   The image tags default to the chart `appVersion`; override with
-   `--set backend.image.tag=...` / `frontend.image.tag=...` if needed.
+   The image tag defaults to the chart `appVersion`; override with
+   `--set backend.image.tag=...` if needed.
 3. **…or via ArgoCD** — register the OCI registry as a Helm repo once, then point
    an ArgoCD `Application` (managed in your GitOps repo) at the chart, setting the
    hostname under `helm.valuesObject`:
@@ -140,26 +139,17 @@ only).
 
 ### Same-origin routing
 
-Both apps share one hostname; Traefik routes:
+The whole hostname (`plants.example.com/*`) routes to the backend, which serves
+both the API (`/api/*`, `/auth/*`) and the built SPA from the same origin, so
+there is no CORS to configure. The SPA is built with `VITE_API_BASE_URL=""` so
+it calls `/api/...` and `/auth/...` on its own origin.
 
-- `plants.example.com/api/*` → backend
-- `plants.example.com/auth/*` → backend
-- `plants.example.com/*` → frontend (SPA)
-
-This avoids CORS entirely. The frontend image is built with
-`VITE_API_BASE_URL=""` so the SPA calls `/api/...` and `/auth/...` on its own
-origin.
-
-## Building container images
+## Building the container image
 
 ```bash
-# Backend (from the repo root)
+# From the repo root
 docker build -f Containerfile -t ghcr.io/<you>/green-thumb:<tag> .
-
-# Frontend (production nginx image)
-docker build -f frontend/Dockerfile --target prod \
-  -t ghcr.io/<you>/green-thumb-frontend:<tag> frontend/
 ```
 
-The backend image also contains Alembic and the migrations, so the same image
-serves the app and runs the migration `initContainer`.
+One image builds the SPA, runs the FastAPI app, serves the static SPA, and
+contains Alembic + the migrations (used by the migration `initContainer`).

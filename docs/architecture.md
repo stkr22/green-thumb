@@ -15,14 +15,13 @@ tasks see [development.md](development.md); for operating it see
 | Deployment | Helm chart (OCI), synced by ArgoCD | `charts/green-thumb/` |
 | Local dev | docker-compose (backend + frontend) | `docker-compose.yml` |
 
-Frontend and backend share one origin in production. Traefik routes `/api/*`
-and `/auth/*` to the backend and everything else to the nginx-served SPA, so
-there is no CORS configuration.
+The SPA and API share one origin in production: the FastAPI backend serves the
+built SPA at `/` alongside the API, so there is no CORS configuration. Traefik
+forwards the whole hostname to the backend.
 
 ```
                       ┌──────────────── Traefik (one hostname) ───────────────┐
-   browser  ──────▶   │  /api/*, /auth/*  → backend (FastAPI)                  │
-                      │  /*               → frontend (nginx + SPA)            │
+   browser  ──────▶   │  /*  → backend (FastAPI: API + static SPA)            │
                       └───────────────────────────────────────────────────────┘
                                    │                         │
                                    ▼                         ▼
