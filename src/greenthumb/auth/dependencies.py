@@ -12,9 +12,15 @@ from greenthumb.models import User
 SessionDep = Annotated[AsyncSession, Depends(get_db)]
 
 
+def _bearer_token(request: Request) -> str | None:
+    """Extract the token from an `Authorization: Bearer <token>` header, if present."""
+    header = request.headers.get("Authorization", "")
+    return header.removeprefix("Bearer ") if header.startswith("Bearer ") else None
+
+
 async def get_current_user(request: Request, session: SessionDep) -> User:
-    """Resolve the current user from the session cookie; 401 when absent or invalid."""
-    token = request.cookies.get(SESSION_COOKIE_NAME)
+    """Resolve the current user from the session cookie or a Bearer token; 401 when absent or invalid."""
+    token = request.cookies.get(SESSION_COOKIE_NAME) or _bearer_token(request)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     user_id = verify_session_token(token)

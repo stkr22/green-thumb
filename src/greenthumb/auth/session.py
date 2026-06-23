@@ -30,6 +30,11 @@ _ALGORITHM = "HS256"
 _PURPOSE_SESSION = "session"
 _PURPOSE_FLOW = "oidc-flow"
 
+# API tokens are ordinary session tokens with a long life, sent via the
+# Authorization header instead of a cookie. They are stateless, so individual
+# tokens cannot be revoked — rotate SESSION_SECRET_KEY to invalidate all of them.
+API_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 90
+
 
 @lru_cache(maxsize=1)
 def _signing_key() -> OctKey:
@@ -64,6 +69,11 @@ def _decode(token: str, expected_purpose: str) -> dict[str, Any] | None:
 def create_session_token(user_id: uuid.UUID) -> str:
     """Create the login session token stored in the session cookie."""
     return _encode({"sub": str(user_id), "purpose": _PURPOSE_SESSION}, get_settings().SESSION_MAX_AGE_SECONDS)
+
+
+def create_api_token(user_id: uuid.UUID) -> str:
+    """Mint a long-lived token for headless API access; verified like a session token."""
+    return _encode({"sub": str(user_id), "purpose": _PURPOSE_SESSION}, API_TOKEN_MAX_AGE_SECONDS)
 
 
 def verify_session_token(token: str) -> uuid.UUID | None:

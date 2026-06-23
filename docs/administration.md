@@ -193,6 +193,21 @@ without contacting Zitadel — useful for local UI work and end-to-end tests.
 While the flag is `false` (the default), the route returns `404`. This is
 covered by tests (`tests/test_dev_login.py`) to ensure it stays inert by default.
 
+### API tokens (headless access)
+
+For scripts or agents that call the API without a browser, mint a long-lived
+bearer token for an existing user:
+
+```bash
+uv run python scripts/mint_api_token.py user@example.com
+```
+
+Send the printed token as `Authorization: Bearer <token>`; it authenticates
+exactly like a session cookie. Tokens are stateless signed JWTs (90-day life),
+so an individual token **cannot** be revoked — rotate `SESSION_SECRET_KEY` to
+invalidate every token and session at once. The user must already exist (log in
+via Zitadel, or the dev-login bypass, once first).
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
