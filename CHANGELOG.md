@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/stkr22/green-thumb/compare/v0.3.0...v0.4.0) (2026-06-23)
+
+
+### Features
+
+* add bearer API tokens for headless access ([d951809](https://github.com/stkr22/green-thumb/commit/d9518094beffc2ba9f028c15826f2ab98b733646))
+* add bearer API tokens for headless access ([4b0fdc9](https://github.com/stkr22/green-thumb/commit/4b0fdc965b776983796f2c28dcde4f942d7af19f))
+
 ## [0.3.0](https://github.com/stkr22/green-thumb/compare/v0.2.0...v0.3.0) (2026-06-22)
 
 
