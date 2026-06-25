@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
-import { Bell, Send } from 'lucide-react';
+import { Bell, Copy, Key, Send } from 'lucide-react';
 
-import { useMe, useTestNotification, useUpdateMe } from '../api/hooks/useProfile';
+import { useMe, useMintApiToken, useTestNotification, useUpdateMe } from '../api/hooks/useProfile';
 import { useToast } from '../components/Toast';
 
 export function ProfilePage() {
   const { data: me } = useMe();
   const updateMe = useUpdateMe();
   const testNotification = useTestNotification();
+  const mintApiToken = useMintApiToken();
   const { notify } = useToast();
   const [topicOverride, setTopicOverride] = useState('');
+  const [apiToken, setApiToken] = useState('');
 
   useEffect(() => {
     setTopicOverride(me?.ntfy_topic_override ?? '');
@@ -88,6 +90,46 @@ export function ProfilePage() {
           <Send className="h-4 w-4" />
           Send test notification
         </button>
+      </div>
+
+      <div className="card mt-6 p-6">
+        <h2 className="mb-1 flex items-center gap-2 font-semibold">
+          <Key className="h-5 w-5 text-emerald-600" />
+          API token
+        </h2>
+        <p className="mb-4 text-sm text-stone-500">
+          A bearer token for scripts that call the API without a browser. Valid for 90 days and shown
+          only once — copy it now. Send it as <code>Authorization: Bearer &lt;token&gt;</code>.
+        </p>
+
+        {apiToken ? (
+          <div className="flex gap-2">
+            <input className="input-base font-mono text-xs" readOnly value={apiToken} />
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={() => {
+                void navigator.clipboard.writeText(apiToken);
+                notify('Token copied');
+              }}
+            >
+              <Copy className="h-4 w-4" />
+              Copy
+            </button>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="btn-primary"
+            disabled={mintApiToken.isPending}
+            onClick={() =>
+              mintApiToken.mutate(undefined, { onSuccess: (res) => setApiToken(res.token) })
+            }
+          >
+            <Key className="h-4 w-4" />
+            Generate token
+          </button>
+        )}
       </div>
     </div>
   );

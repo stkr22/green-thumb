@@ -196,13 +196,16 @@ covered by tests (`tests/test_dev_login.py`) to ensure it stays inert by default
 ### API tokens (headless access)
 
 For scripts or agents that call the API without a browser, mint a long-lived
-bearer token for an existing user:
+bearer token. The easy path: sign in and use **Profile → API token → Generate
+token** (`POST /auth/api-token`), then copy it — it's shown only once.
+
+From a shell (no browser), mint one for an existing user instead:
 
 ```bash
 uv run python scripts/mint_api_token.py user@example.com
 ```
 
-Send the printed token as `Authorization: Bearer <token>`; it authenticates
+Either way, send the token as `Authorization: Bearer <token>`; it authenticates
 exactly like a session cookie. Tokens are stateless signed JWTs (90-day life),
 so an individual token **cannot** be revoked — rotate `SESSION_SECRET_KEY` to
 invalidate every token and session at once. The user must already exist (log in

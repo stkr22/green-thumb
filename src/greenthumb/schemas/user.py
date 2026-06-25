@@ -22,3 +22,9 @@ class UserUpdate(SQLModel):
 
     ntfy_enabled: bool | None = None
     ntfy_topic_override: str | None = None
+
+
+class ApiTokenRead(SQLModel):
+    """A freshly minted API token. Shown once; the server keeps no copy."""
+
+    token: str

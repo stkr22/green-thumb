@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, jsonBody } from '../client';
-import type { UserRead, UserUpdate } from '../types';
+import type { ApiTokenRead, UserRead, UserUpdate } from '../types';
 
 export function useMe() {
   return useQuery({ queryKey: ['me'], queryFn: () => api<UserRead>('/auth/me'), retry: false });
@@ -18,5 +18,11 @@ export function useUpdateMe() {
 export function useTestNotification() {
   return useMutation({
     mutationFn: () => api<{ detail: string }>('/api/v1/notifications/test', { method: 'POST' }),
+  });
+}
+
+export function useMintApiToken() {
+  return useMutation({
+    mutationFn: () => api<ApiTokenRead>('/auth/api-token', { method: 'POST' }),
   });
 }
