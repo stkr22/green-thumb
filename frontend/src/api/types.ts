@@ -5,6 +5,7 @@ import type { components } from './types.gen';
 
 export type UserRead = components['schemas']['UserRead'];
 export type UserUpdate = components['schemas']['UserUpdate'];
+export type ApiTokenRead = components['schemas']['ApiTokenRead'];
 export type LocationRead = components['schemas']['LocationRead'];
 export type LocationCreate = components['schemas']['LocationCreate'];
 export type LocationUpdate = components['schemas']['LocationUpdate'];

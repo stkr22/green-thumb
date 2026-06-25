@@ -17,13 +17,14 @@ from greenthumb.auth.session import (
     FLOW_COOKIE_NAME,
     FLOW_TOKEN_MAX_AGE_SECONDS,
     SESSION_COOKIE_NAME,
+    create_api_token,
     create_flow_token,
     create_session_token,
     verify_flow_token,
 )
 from greenthumb.config import get_settings
 from greenthumb.models import User
-from greenthumb.schemas import UserRead, UserUpdate
+from greenthumb.schemas import ApiTokenRead, UserRead, UserUpdate
 
 logger = logging.getLogger(__name__)
 
@@ -180,3 +181,13 @@ async def update_me(payload: UserUpdate, current_user: CurrentUser, session: Ses
     await session.commit()
     await session.refresh(current_user)
     return current_user
+
+
+@router.post("/api-token", response_model=ApiTokenRead, status_code=status.HTTP_201_CREATED)
+async def mint_api_token(current_user: CurrentUser) -> ApiTokenRead:
+    """Mint a long-lived bearer token for headless API access by the current user.
+
+    Stateless and shown only once — the server keeps no copy. Rotate
+    SESSION_SECRET_KEY to revoke (invalidates all tokens and sessions).
+    """
+    return ApiTokenRead(token=create_api_token(current_user.id))
