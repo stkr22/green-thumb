@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.5.0](https://github.com/stkr22/green-thumb/compare/v0.4.0...v0.5.0) (2026-06-25)
+
+
+### Features
+
+* mint API tokens from the Profile page ([d3b4cd5](https://github.com/stkr22/green-thumb/commit/d3b4cd50ac2c8def5098da0ae9ce754957c7a370))
+* mint API tokens from the Profile page ([8517afb](https://github.com/stkr22/green-thumb/commit/8517afb33ff415f94d4f835323a475fb8a6ce97f))
+
 ## [0.4.0](https://github.com/stkr22/green-thumb/compare/v0.3.0...v0.4.0) (2026-06-23)
 
 
