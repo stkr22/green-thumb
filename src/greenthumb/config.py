@@ -49,9 +49,9 @@ class Settings(BaseSettings):
     # the Vite dev server instead); the production image sets it to /app/static.
     STATIC_DIR: str = ""
 
-    # How often the background loop evaluates reminders. One hour is plenty for
-    # day-granularity intervals while keeping ntfy traffic low.
-    REMINDER_CHECK_INTERVAL_SECONDS: int = Field(default=3600, ge=60)
+    # How often the background loop evaluates reminders. Care intervals are in
+    # days, so a daily check is plenty and keeps ntfy traffic low.
+    REMINDER_CHECK_INTERVAL_SECONDS: int = Field(default=86400, ge=60)
 
     LOG_LEVEL: str = "INFO"
 

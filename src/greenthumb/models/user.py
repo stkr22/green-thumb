@@ -18,7 +18,7 @@ class User(SQLModel, table=True):
     oidc_sub: str = Field(unique=True, index=True)
     email: str
     display_name: str
-    ntfy_enabled: bool = Field(default=False)
+    ntfy_enabled: bool = Field(default=True)
     # Per-user topic override; falls back to the global NTFY_TOPIC when unset.
     ntfy_topic_override: str | None = Field(default=None)
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(utc_datetime_type(), nullable=False))

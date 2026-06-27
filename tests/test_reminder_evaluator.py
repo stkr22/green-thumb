@@ -36,6 +36,8 @@ async def _make_overdue_reminder(session: AsyncSession, plant: Plant, user: User
 async def test_no_recipients_means_no_notifications(
     session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
 ):
+    user.ntfy_enabled = False
+    session.add(user)
     await _make_overdue_reminder(session, plant, user)
     assert await reminder_evaluator.evaluate_and_notify(session) == 0
     assert sent_notifications == []
@@ -52,8 +54,8 @@ async def test_overdue_reminder_notifies_subscribed_users(
     assert await reminder_evaluator.evaluate_and_notify(session) == 1
     assert len(sent_notifications) == 1
     payload = sent_notifications[0]
-    assert payload["title"] == "Time to water your Monstera"
-    assert "Last watering 10 days ago" in payload["message"]
+    assert payload["title"] == "🌱 1 plant care reminder"
+    assert "Water Monstera (last watering 10 days ago)" in payload["message"]
     assert payload["topic"] == "my-topic"
 
     await session.refresh(reminder)
@@ -100,6 +102,26 @@ async def test_not_due_reminder_does_not_notify(
     assert sent_notifications == []
 
 
+async def test_multiple_overdue_reminders_batch_into_one_message(
+    session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
+):
+    user.ntfy_enabled = True
+    session.add(user)
+    await _make_overdue_reminder(session, plant, user)  # watering on Monstera
+    other = Plant(name="Fern", created_by=user.id)
+    session.add(other)
+    await session.commit()
+    session.add(Reminder(plant_id=other.id, event_type="repotting", interval_days=365, created_by=user.id))
+    await session.commit()
+
+    # Two overdue reminders, but only a single digest notification is sent.
+    assert await reminder_evaluator.evaluate_and_notify(session) == 1
+    assert len(sent_notifications) == 1
+    message = sent_notifications[0]["message"]
+    assert "Water Monstera" in message
+    assert "Repot Fern" in message
+
+
 async def test_reminder_without_any_log_notifies(
     session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
 ):
@@ -109,4 +131,4 @@ async def test_reminder_without_any_log_notifies(
     await session.commit()
 
     assert await reminder_evaluator.evaluate_and_notify(session) == 1
-    assert "No repotting recorded yet" in sent_notifications[0]["message"]
+    assert "Repot Monstera (no repotting recorded yet)" in sent_notifications[0]["message"]

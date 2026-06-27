@@ -42,14 +42,14 @@ async def test_me_returns_profile(client: httpx.AsyncClient):
     assert response.status_code == 200
     body = response.json()
     assert body["email"] == "gardener@example.com"
-    assert body["ntfy_enabled"] is False
+    assert body["ntfy_enabled"] is True  # notifications are on by default
 
 
 async def test_patch_me_updates_ntfy_preferences(client: httpx.AsyncClient):
-    response = await client.patch("/auth/me", json={"ntfy_enabled": True, "ntfy_topic_override": "my-plants"})
+    response = await client.patch("/auth/me", json={"ntfy_enabled": False, "ntfy_topic_override": "my-plants"})
     assert response.status_code == 200
     body = response.json()
-    assert body["ntfy_enabled"] is True
+    assert body["ntfy_enabled"] is False
     assert body["ntfy_topic_override"] == "my-plants"
 
 
