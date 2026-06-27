@@ -1,6 +1,6 @@
 """Reminder evaluation: compute due state and send ntfy notifications.
 
-The same status computation backs the dashboard endpoint and the hourly
+The same status computation backs the dashboard endpoint and the daily
 background loop, so both always agree on what counts as overdue.
 """
 
@@ -72,30 +72,37 @@ async def compute_reminder_statuses(session: AsyncSession) -> list[ReminderStatu
     ]
 
 
-def _build_message(status: ReminderStatus) -> tuple[str, str]:
-    """Build the ntfy title/message pair for an overdue reminder."""
+def _digest_line(status: ReminderStatus) -> str:
+    """One bullet line describing an overdue reminder in the digest."""
     verb = _EVENT_VERBS.get(status.event_type)
-    title = f"Time to {verb} your {status.plant_name}" if verb else f"{status.plant_name}: {status.event_type} is due"
+    action = f"{verb.capitalize()} {status.plant_name}" if verb else f"{status.plant_name}: {status.event_type}"
     if status.last_event_at:
         days_ago = (utcnow() - status.last_event_at).days
-        message = f"Last {status.event_type} {days_ago} days ago. Reminder set for every {status.interval_days} days."
-    else:
-        message = f"No {status.event_type} recorded yet. Reminder set for every {status.interval_days} days."
-    return title, message
+        return f"- {action} (last {status.event_type} {days_ago} days ago)"
+    return f"- {action} (no {status.event_type} recorded yet)"
+
+
+def _build_digest(statuses: list[ReminderStatus]) -> tuple[str, str]:
+    """Title/body for a single notification summarising all overdue reminders."""
+    n = len(statuses)
+    title = f"🌱 {n} plant care reminder{'s' if n != 1 else ''}"
+    return title, "\n".join(_digest_line(s) for s in statuses)
 
 
 async def evaluate_and_notify(session: AsyncSession) -> int:
-    """Notify subscribed users about overdue reminders; returns notifications sent.
+    """Send subscribed users one digest of all overdue reminders; returns messages sent.
 
-    Re-notification is throttled to interval_days / 2 since the last successful
-    notification so an ignored reminder doesn't fire every hour.
+    Reminders are batched into a single notification so users aren't flooded when
+    several plants come due at once. Each reminder is re-included only after
+    interval_days / 2 has passed since its last notification, so an ignored
+    reminder doesn't reappear in every digest.
     """
     now = utcnow()
     recipients = list((await session.exec(select(User).where(col(User.ntfy_enabled).is_(True)))).all())
     if not recipients:
         return 0
 
-    sent = 0
+    due: list[tuple[Reminder, ReminderStatus]] = []
     for reminder, plant_name, last_at in await _reminder_rows(session):
         status = _status_for(reminder, plant_name, last_at)
         if not status.overdue:
@@ -104,19 +111,25 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
             renotify_after = ensure_utc(reminder.last_notified_at) + timedelta(days=reminder.interval_days / 2)
             if now < renotify_after:
                 continue
-        title, message = _build_message(status)
-        delivered = False
-        for user in recipients:
-            delivered = (
-                await ntfy.send_notification(title=title, message=message, topic=user.ntfy_topic_override) or delivered
-            )
-        if delivered:
+        due.append((reminder, status))
+
+    if not due:
+        return 0
+
+    title, message = _build_digest([status for _, status in due])
+    sent = 0
+    delivered = False
+    for user in recipients:
+        ok = await ntfy.send_notification(title=title, message=message, topic=user.ntfy_topic_override)
+        delivered = delivered or ok
+        sent += int(ok)
+    if delivered:
+        for reminder, _ in due:
             reminder.last_notified_at = now
             session.add(reminder)
-            sent += 1
     await session.commit()
     if sent:
-        logger.info("Sent %d reminder notification(s)", sent)
+        logger.info("Sent %d reminder digest(s) covering %d reminder(s)", sent, len(due))
     return sent
 
 
