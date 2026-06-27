@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.0](https://github.com/stkr22/green-thumb/compare/v0.5.0...v0.6.0) (2026-06-27)
+
+
+### Features
+
+* batch care reminders into a daily digest and add card quick act… ([4e8a181](https://github.com/stkr22/green-thumb/commit/4e8a181f590f5f032fe60647e8f87d0c1bceb850))
+* batch care reminders into a daily digest and add card quick actions ([9e9fce5](https://github.com/stkr22/green-thumb/commit/9e9fce5395f821bcffc5897873c7374811e5388c))
+
 ## [0.5.0](https://github.com/stkr22/green-thumb/compare/v0.4.0...v0.5.0) (2026-06-25)
 
 
