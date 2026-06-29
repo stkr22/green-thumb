@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.0](https://github.com/stkr22/green-thumb/compare/v0.6.0...v0.7.0) (2026-06-29)
+
+
+### Features
+
+* **frontend:** make the SPA usable on mobile viewports ([4c0025c](https://github.com/stkr22/green-thumb/commit/4c0025c07242be70c100a0ae0ae77d43ae601c38))
+* **frontend:** make the SPA usable on mobile viewports ([44ced78](https://github.com/stkr22/green-thumb/commit/44ced781eac27fdb3dd63760087cbc3a46fcb859))
+
 ## [0.6.0](https://github.com/stkr22/green-thumb/compare/v0.5.0...v0.6.0) (2026-06-27)
 
 
