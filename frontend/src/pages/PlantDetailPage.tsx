@@ -14,20 +14,22 @@ import { PlantForm } from '../components/PlantForm';
 import { useToast } from '../components/Toast';
 import { formatDateTime, formatDaysAgo } from '../lib/dates';
 
+// `past` is spelled out rather than derived (e.g. `label + 'ed'`) because the
+// suffix rule breaks on "Fertilise" → "Fertiliseed" and "Repot" → "Repoted".
 const QUICK_ACTIONS = [
-  { eventType: 'watering', label: 'Water', icon: Droplets },
-  { eventType: 'fertilising', label: 'Fertilise', icon: FlaskConical },
-  { eventType: 'repotting', label: 'Repot', icon: Shovel },
+  { eventType: 'watering', label: 'Water', past: 'Watered', icon: Droplets },
+  { eventType: 'fertilising', label: 'Fertilise', past: 'Fertilised', icon: FlaskConical },
+  { eventType: 'repotting', label: 'Repot', past: 'Repotted', icon: Shovel },
 ];
 
 function CareSummary({ plant }: { plant: PlantDetail }) {
   return (
     <div className="flex flex-wrap gap-4">
-      {QUICK_ACTIONS.map(({ eventType, label, icon: Icon }) => (
+      {QUICK_ACTIONS.map(({ eventType, past, icon: Icon }) => (
         <div key={eventType} className="card flex items-center gap-3 px-4 py-3">
           <Icon className="h-5 w-5 text-emerald-600" />
           <div>
-            <p className="text-sm font-medium">{label}ed</p>
+            <p className="text-sm font-medium">{past}</p>
             <p className="text-sm text-stone-500">{formatDaysAgo(plant.last_events?.[eventType])}</p>
           </div>
         </div>
