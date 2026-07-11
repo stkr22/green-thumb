@@ -1,5 +1,5 @@
 import { NavLink, Outlet } from 'react-router-dom';
-import { CalendarDays, LayoutDashboard, Leaf, LogOut, MapPin, UserCircle } from 'lucide-react';
+import { CalendarDays, LayoutDashboard, Leaf, LogOut, MapPin, Sprout, UserCircle } from 'lucide-react';
 
 import { logoutUrl } from '../api/client';
 import type { UserRead } from '../api/types';
@@ -7,6 +7,7 @@ import type { UserRead } from '../api/types';
 const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/plants', label: 'Plants', icon: Leaf },
+  { to: '/species', label: 'Species', icon: Sprout },
   { to: '/locations', label: 'Locations', icon: MapPin },
   { to: '/calendar', label: 'Calendar', icon: CalendarDays },
   { to: '/profile', label: 'Profile', icon: UserCircle },

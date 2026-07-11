@@ -10,6 +10,7 @@ import { PlantDetailPage } from './pages/PlantDetailPage';
 import { PlantNewPage } from './pages/PlantNewPage';
 import { PlantsPage } from './pages/PlantsPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { SpeciesPage } from './pages/SpeciesPage';
 
 export function App() {
   // Cookie-based auth: probe the session on load. The API client redirects to
@@ -40,6 +41,7 @@ export function App() {
           <Route path="/plants/new" element={<PlantNewPage />} />
           <Route path="/plants/:id" element={<PlantDetailPage />} />
           <Route path="/locations" element={<LocationsPage />} />
+          <Route path="/species" element={<SpeciesPage />} />
           <Route path="/calendar" element={<CalendarPage />} />
           <Route path="/profile" element={<ProfilePage />} />
         </Route>

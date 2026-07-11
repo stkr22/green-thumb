@@ -5,13 +5,19 @@ from datetime import datetime
 
 from sqlmodel import Field, SQLModel
 
+from greenthumb.schemas.species import SpeciesRead
+
 
 class PlantCreate(SQLModel):
-    """Payload to create a plant."""
+    """Payload to create a plant.
+
+    Linking a species materializes its default care intervals as reminders.
+    """
 
     name: str = Field(min_length=1, max_length=200)
     species_name: str | None = None
     scientific_name: str | None = None
+    species_id: uuid.UUID | None = None
     location_id: uuid.UUID | None = None
     notes: str | None = None
     tags: list[str] = Field(default_factory=list)
@@ -23,6 +29,7 @@ class PlantUpdate(SQLModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     species_name: str | None = None
     scientific_name: str | None = None
+    species_id: uuid.UUID | None = None
     location_id: uuid.UUID | None = None
     notes: str | None = None
     tags: list[str] | None = None
@@ -35,6 +42,7 @@ class PlantRead(SQLModel):
     name: str
     species_name: str | None
     scientific_name: str | None
+    species_id: uuid.UUID | None
     location_id: uuid.UUID | None
     notes: str | None
     tags: list[str]
@@ -45,15 +53,25 @@ class PlantRead(SQLModel):
 
 
 class PlantListItem(PlantRead):
-    """Plant card data: includes the last watering for the 'X days ago' indicator."""
+    """Plant card data.
+
+    Includes the last watering for the 'X days ago' indicator and the species
+    label resolved from the linked species or the free-text fallback.
+    """
 
     last_watered_at: datetime | None = None
+    species_display_name: str | None = None
 
 
 class PlantDetail(PlantRead):
-    """Plant detail: last care event per event type (e.g. watering/fertilising/repotting)."""
+    """Plant detail: last care event per event type, plus the linked species.
+
+    The species is embedded so the detail page can render care guidance
+    without a second request.
+    """
 
     last_events: dict[str, datetime] = Field(default_factory=dict)
+    species: SpeciesRead | None = None
 
 
 class CoverPhotoUpdate(SQLModel):

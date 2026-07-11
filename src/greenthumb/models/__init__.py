@@ -5,6 +5,7 @@ from greenthumb.models.location import Location
 from greenthumb.models.photo import PlantPhoto
 from greenthumb.models.plant import Plant
 from greenthumb.models.reminder import Reminder
+from greenthumb.models.species import Species
 from greenthumb.models.user import User
 
-__all__ = ["CareLog", "Location", "Plant", "PlantPhoto", "Reminder", "User"]
+__all__ = ["CareLog", "Location", "Plant", "PlantPhoto", "Reminder", "Species", "User"]

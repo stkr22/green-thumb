@@ -13,6 +13,7 @@ from greenthumb.schemas.plant import (
     PlantUpdate,
 )
 from greenthumb.schemas.reminder import ReminderCreate, ReminderRead, ReminderUpdate
+from greenthumb.schemas.species import SpeciesCreate, SpeciesListItem, SpeciesRead, SpeciesUpdate
 from greenthumb.schemas.user import ApiTokenRead, UserRead, UserUpdate
 
 __all__ = [
@@ -35,6 +36,10 @@ __all__ = [
     "ReminderRead",
     "ReminderStatus",
     "ReminderUpdate",
+    "SpeciesCreate",
+    "SpeciesListItem",
+    "SpeciesRead",
+    "SpeciesUpdate",
     "UserRead",
     "UserUpdate",
 ]
