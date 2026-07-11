@@ -1,6 +1,7 @@
 """Reminder routes."""
 
 import uuid
+from datetime import timedelta
 
 from fastapi import APIRouter, HTTPException, status
 from sqlmodel import select
@@ -8,16 +9,24 @@ from sqlmodel import select
 from greenthumb.api.v1.deps import get_plant_or_404
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Reminder
-from greenthumb.schemas import ReminderCreate, ReminderRead, ReminderUpdate
+from greenthumb.schemas import ReminderCreate, ReminderRead, ReminderStatusRead, ReminderUpdate
+from greenthumb.services import care
 
 router = APIRouter(tags=["reminders"])
 
 
-@router.get("/plants/{plant_id}/reminders", response_model=list[ReminderRead])
-async def list_reminders(plant_id: uuid.UUID, session: SessionDep, _user: CurrentUser) -> list[Reminder]:
-    """List reminders configured for a plant."""
+@router.get("/plants/{plant_id}/reminders", response_model=list[ReminderStatusRead])
+async def list_reminders(plant_id: uuid.UUID, session: SessionDep, _user: CurrentUser) -> list[ReminderStatusRead]:
+    """List reminders for a plant with their computed next-due timestamps."""
     await get_plant_or_404(session, plant_id)
-    return list((await session.exec(select(Reminder).where(Reminder.plant_id == plant_id))).all())
+    reminders = (await session.exec(select(Reminder).where(Reminder.plant_id == plant_id))).all()
+    last_events = await care.last_event_per_type(session, plant_id)
+    result = []
+    for reminder in reminders:
+        last = last_events.get(reminder.event_type)
+        due_at = last + timedelta(days=reminder.interval_days) if last else None
+        result.append(ReminderStatusRead(**reminder.model_dump(), due_at=due_at))
+    return result
 
 
 @router.post("/plants/{plant_id}/reminders", response_model=ReminderRead, status_code=status.HTTP_201_CREATED)

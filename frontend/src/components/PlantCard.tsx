@@ -35,7 +35,9 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
       )}
       <div className="p-4">
         <h3 className="font-semibold">{plant.name}</h3>
-        {plant.species_name && <p className="text-sm italic text-stone-500">{plant.species_name}</p>}
+        {plant.species_display_name && (
+          <p className="text-sm italic text-stone-500">{plant.species_display_name}</p>
+        )}
         <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-stone-500">
           {locationName && (
             <span className="flex items-center gap-1">

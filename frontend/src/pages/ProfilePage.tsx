@@ -1,8 +1,73 @@
 import { useEffect, useState } from 'react';
-import { Bell, Copy, Key, Send } from 'lucide-react';
+import { Bell, BellRing, Copy, Key, Send, Smartphone } from 'lucide-react';
 
 import { useMe, useMintApiToken, useTestNotification, useUpdateMe } from '../api/hooks/useProfile';
+import { usePushPublicKey, useSubscribePush, useUnsubscribePush } from '../api/hooks/usePush';
 import { useToast } from '../components/Toast';
+import { getCurrentSubscription, pushSupported } from '../lib/push';
+
+function DevicePushSection() {
+  const { data: publicKey } = usePushPublicKey();
+  const subscribePush = useSubscribePush();
+  const unsubscribePush = useUnsubscribePush();
+  const { notify } = useToast();
+  const [subscribed, setSubscribed] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void getCurrentSubscription().then((subscription) => setSubscribed(subscription !== null));
+  }, []);
+
+  // Server has no VAPID key or the browser can't do push: nothing to offer.
+  if (!publicKey?.key || !pushSupported()) return null;
+
+  return (
+    <div className="mb-4 rounded-lg border border-stone-200 p-4">
+      <h3 className="mb-1 flex items-center gap-2 text-sm font-medium">
+        <Smartphone className="h-4 w-4 text-emerald-600" />
+        Push notifications on this device
+      </h3>
+      <p className="mb-3 text-xs text-stone-500">
+        Native notifications without ntfy, straight to this browser or installed app. On iPhone, add the
+        app to your home screen first.
+      </p>
+      {subscribed === null ? null : subscribed ? (
+        <button
+          type="button"
+          className="btn-secondary"
+          disabled={unsubscribePush.isPending}
+          onClick={() =>
+            unsubscribePush.mutate(undefined, {
+              onSuccess: () => {
+                setSubscribed(false);
+                notify('Push notifications disabled on this device');
+              },
+            })
+          }
+        >
+          Disable on this device
+        </button>
+      ) : (
+        <button
+          type="button"
+          className="btn-primary"
+          disabled={subscribePush.isPending}
+          onClick={() =>
+            subscribePush.mutate(publicKey.key!, {
+              onSuccess: () => {
+                setSubscribed(true);
+                notify('Push notifications enabled on this device');
+              },
+              onError: () => notify('Could not enable push — notification permission was denied'),
+            })
+          }
+        >
+          <BellRing className="h-4 w-4" />
+          Enable on this device
+        </button>
+      )}
+    </div>
+  );
+}
 
 export function ProfilePage() {
   const { data: me } = useMe();
@@ -41,6 +106,7 @@ export function ProfilePage() {
           <Bell className="h-5 w-5 text-emerald-600" />
           Notifications
         </h2>
+        <DevicePushSection />
         <label className="mb-4 flex items-center gap-3 text-sm">
           <input
             type="checkbox"

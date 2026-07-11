@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     NTFY_TOPIC: str = "greenthumb"
     NTFY_TOKEN: str | None = None
 
+    # Web Push (VAPID). The private key is the raw base64url-encoded EC key
+    # (see docs/administration.md for how to generate one); leaving it empty
+    # disables Web Push entirely. The subject identifies the operator to the
+    # browser push services and must be a mailto: or https: URI.
+    VAPID_PRIVATE_KEY: str = ""
+    VAPID_SUBJECT: str = "mailto:admin@example.com"
+
     FRONTEND_URL: str = "http://localhost:5173"
 
     # Directory of the built SPA to serve at /. Empty disables it (local dev runs

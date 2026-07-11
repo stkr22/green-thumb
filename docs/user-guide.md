@@ -27,7 +27,10 @@ The landing page summarises what needs attention:
 - **Recently watered** — the latest waterings across all plants.
 - **Counts** — total plants and locations.
 
-Click any plant in these lists to jump to its detail page.
+Click any plant in these lists to jump to its detail page — or act right
+here: every overdue/upcoming row has a **Done** button that logs the care
+event, and when several plants have overdue watering a **Water all** button
+logs them in one go.
 
 ## Locations
 
@@ -41,6 +44,30 @@ Locations are the rooms or areas where your plants live (e.g. "Living room",
 
 Each location shows how many plants it currently holds.
 
+## Species
+
+Species hold the care knowledge that is shared by every plant of the same
+kind, so you enter it once instead of per plant. On the **Species** page you
+can add, search, edit and delete species. A species stores:
+
+- **Name** and **scientific name**.
+- **Care advice** — light, watering, soil & repotting hints.
+- **Deadheading** — whether the species needs it, with an optional hint.
+- **Toxicity** — e.g. "Toxic to cats and dogs" (shown as a red badge).
+- **Common issues** — free text describing typical illnesses and how to spot
+  them (e.g. "Spider mites: fine webbing under leaves").
+- **Default care plan** — default reminder intervals (watering, fertilising,
+  repotting).
+
+Linking a plant to a species shows all of this as a **Care guide** on the
+plant's detail page. When you create a plant with a species, the species'
+default care plan is materialised as that plant's reminders automatically;
+you can still tune every interval per plant afterwards — changing the species
+never touches existing plants' reminders. For older plants, use **Apply
+default care plan** in the care guide (it only adds what's missing).
+
+Deleting a species keeps its plants; they just lose the link.
+
 ## Plants
 
 ### Adding a plant
@@ -48,8 +75,8 @@ Each location shows how many plants it currently holds.
 Click **+ Add plant** on the Plants page. Fields:
 
 - **Name** (required) — your name for the plant, e.g. "Kitchen Monstera".
-- **Species** — free text, e.g. "Monstera".
-- **Scientific name** — e.g. *Monstera deliciosa*.
+- **Species** — pick one from your species library, create one inline with
+  **New**, or leave it empty and use the free-text species fields instead.
 - **Location** — choose an existing location, or leave as "No location".
 - **Tags** — comma-separated, e.g. `tropical, low-light`. Used for filtering.
 - **Notes** — free text.
@@ -61,26 +88,35 @@ The **Plants** page shows a card per plant with its cover photo (or a
 placeholder), name, species, location, tags, and a "watered X days ago"
 indicator. You can:
 
-- **Search** by name or species.
+- **Search** by name or species (including the linked species' names).
 - **Filter by location**.
 - **Filter by tag** (the dropdown lists every tag currently in use).
+- **Sort** by name, longest-unwatered first, or recently-watered first.
 
 ### Plant detail
 
 Open a plant to see everything about it and to take action:
 
-- **Header** — cover photo, name, scientific name, location, tags, notes.
+- **Header** — cover photo, name, species/scientific name, location, tags, notes.
 - **Edit** — change any plant field.
 - **Delete** — removes the plant **and** its photos, care logs and reminders.
+- **Care guide** — the linked species' advice (light, watering, soil,
+  deadheading, toxicity, common issues) plus **Apply default care plan**.
 - **Care summary** — days since last Watered / Fertilised / Repotted.
 - **Quick-log buttons** — **Water**, **Fertilise**, **Repot**, or **+ Custom**
   for any other event type. Logging shows a confirmation and updates the summary
   immediately.
-- **Photos** — upload images, set any photo as the **cover** (star icon), or
-  delete photos. Deleting the cover photo just clears the cover.
+- **Photos** — upload one or several images at once, set any photo as the
+  **cover** (star icon), or delete photos (asks for confirmation). Deleting
+  the cover photo just clears the cover.
+- **Growth journal** — photos and care events merged into one month-by-month
+  timeline of the plant's life.
 - **Care log** — a timeline of all events, filterable by type and paginated.
-  Delete individual entries with the trash icon.
-- **Reminders** — list, add, enable/disable, and delete reminders for the plant.
+  Deleting an entry offers **Undo** in the confirmation toast.
+- **Reminders** — list, add, enable/disable, and delete reminders. Each
+  reminder shows when it next fires ("due in 3 days", "due today", overdue).
+  The event picker offers the standard types; choose **Custom…** for anything
+  else. Deleting offers **Undo**.
 
 ## Logging care
 
@@ -112,21 +148,41 @@ The **Calendar** shows a month at a time. Days with upcoming care show a count
 badge; overdue items appear on today. Click a day to list exactly which plants
 are due and for what. Use the arrows to change month.
 
+## Installing the app (PWA)
+
+Green Thumb is an installable web app: add it to your phone's home screen (or
+install it from the browser menu on desktop) and it opens full-screen like a
+native app, with the shell available even while briefly offline. On iPhone use
+Safari's **Share → Add to Home Screen** — this is also required for push
+notifications on iOS.
+
 ## Notifications (Profile)
 
 On the **Profile** page:
 
 - **Account** — your display name and email (read-only; managed by SSO).
+- **Push notifications on this device** — **Enable on this device** to get
+  native notifications on this browser/phone, no extra app needed. Shown only
+  when the administrator has configured Web Push. Disable it again on the
+  same device at any time.
 - **Send me ntfy push notifications** — toggle to receive overdue-reminder
-  pushes. Off by default.
+  pushes via ntfy. Off by default.
 - **ntfy topic override** — by default notifications go to the server's
   configured topic; set your own topic here to receive them on a personal
   channel.
-- **Send test notification** — verifies your notification setup end to end.
+- **Send test notification** — verifies your notification setup end to end,
+  over every channel you have enabled.
 
-### Receiving notifications
+### Native push (Web Push)
 
-Notifications are delivered through [ntfy](https://ntfy.sh):
+1. On iPhone: install the app to your home screen first (see above), then
+   open it from there. Android and desktop browsers work directly.
+2. Tap **Enable on this device** on the Profile page and allow notifications.
+3. **Send test notification** to confirm.
+
+### ntfy
+
+Notifications can also be delivered through [ntfy](https://ntfy.sh):
 
 1. Install the ntfy app (iOS/Android) or open the ntfy web app.
 2. Subscribe to the topic — either the server's default topic (ask your

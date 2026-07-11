@@ -33,3 +33,13 @@ class ReminderRead(SQLModel):
     last_notified_at: datetime | None
     created_by: uuid.UUID
     created_at: datetime
+
+
+class ReminderStatusRead(ReminderRead):
+    """A reminder plus its computed schedule, for the plant detail page.
+
+    due_at is None when no matching care event exists yet — the reminder is
+    due immediately, matching the evaluator's overdue rule.
+    """
+
+    due_at: datetime | None = None

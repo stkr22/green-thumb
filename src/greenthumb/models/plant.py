@@ -10,7 +10,11 @@ from greenthumb.models.base import utc_datetime_type, utcnow
 
 
 class Plant(SQLModel, table=True):
-    """A tracked plant. Species fields are free text, set directly via the API."""
+    """A tracked plant.
+
+    species_id links shared care knowledge; the free-text species_name /
+    scientific_name fields remain for plants without a species entry.
+    """
 
     __tablename__ = "plants"
 
@@ -18,6 +22,7 @@ class Plant(SQLModel, table=True):
     name: str = Field(index=True)
     species_name: str | None = Field(default=None)
     scientific_name: str | None = Field(default=None)
+    species_id: uuid.UUID | None = Field(default=None, foreign_key="species.id", ondelete="SET NULL", index=True)
     location_id: uuid.UUID | None = Field(default=None, foreign_key="locations.id", ondelete="SET NULL")
     notes: str | None = Field(default=None)
     tags: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))

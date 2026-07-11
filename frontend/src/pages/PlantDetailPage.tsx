@@ -1,18 +1,42 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Camera, Droplets, FlaskConical, Leaf, MapPin, Pencil, Plus, Shovel, Star, Trash2 } from 'lucide-react';
+import {
+  BellPlus,
+  Camera,
+  Droplets,
+  FlaskConical,
+  Leaf,
+  MapPin,
+  Pencil,
+  Plus,
+  Scissors,
+  Shovel,
+  Sprout,
+  Star,
+  Sun,
+  Trash2,
+  TriangleAlert,
+} from 'lucide-react';
 
 import { photoUrl, thumbnailUrl } from '../api/client';
 import { useLocations } from '../api/hooks/useLocations';
 import { LOGS_PAGE_SIZE, useCreateLog, useDeleteLog, useLogs } from '../api/hooks/useLogs';
 import { useDeletePhoto, usePhotos, useUploadPhoto } from '../api/hooks/usePhotos';
-import { useDeletePlant, usePlant, useSetCoverPhoto, useUpdatePlant } from '../api/hooks/usePlants';
+import {
+  useApplySpeciesDefaults,
+  useDeletePlant,
+  usePlant,
+  useSetCoverPhoto,
+  useUpdatePlant,
+} from '../api/hooks/usePlants';
 import { useCreateReminder, useDeleteReminder, useReminders, useUpdateReminder } from '../api/hooks/useReminders';
 import type { PlantDetail } from '../api/types';
+import { GrowthJournal } from '../components/GrowthJournal';
 import { Modal } from '../components/Modal';
 import { PlantForm } from '../components/PlantForm';
+import { CardSkeleton, Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { formatDateTime, formatDaysAgo } from '../lib/dates';
+import { formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
 
 // `past` is spelled out rather than derived (e.g. `label + 'ed'`) because the
 // suffix rule breaks on "Fertilise" → "Fertiliseed" and "Repot" → "Repoted".
@@ -38,12 +62,99 @@ function CareSummary({ plant }: { plant: PlantDetail }) {
   );
 }
 
+function CareGuide({ plant }: { plant: PlantDetail }) {
+  const applyDefaults = useApplySpeciesDefaults(plant.id);
+  const { notify } = useToast();
+  const species = plant.species;
+  if (!species) return null;
+
+  const hints = [
+    { icon: Sun, label: 'Light', value: species.light },
+    { icon: Droplets, label: 'Watering', value: species.watering_hint },
+    { icon: Shovel, label: 'Soil & repotting', value: species.soil_hint },
+    {
+      icon: Scissors,
+      label: 'Deadheading',
+      value: species.deadheading ? (species.deadheading_hint ?? 'Remove spent blooms regularly') : null,
+    },
+    { icon: TriangleAlert, label: 'Toxicity', value: species.toxicity },
+  ].filter((hint) => hint.value);
+  const hasDefaults = Object.keys(species.default_intervals).length > 0;
+  if (hints.length === 0 && !species.common_issues && !hasDefaults) return null;
+
+  return (
+    <section className="card p-5">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold">
+          <Sprout className="h-4 w-4 text-emerald-600" />
+          Care guide
+          <span className="text-sm font-normal italic text-stone-500">{species.name}</span>
+        </h2>
+        {hasDefaults && (
+          <button
+            type="button"
+            className="btn-secondary"
+            disabled={applyDefaults.isPending}
+            onClick={() =>
+              applyDefaults.mutate(undefined, {
+                onSuccess: (created) =>
+                  notify(
+                    created.length > 0
+                      ? `${created.length} reminder${created.length === 1 ? '' : 's'} added`
+                      : 'All default reminders already exist',
+                  ),
+              })
+            }
+          >
+            <BellPlus className="h-4 w-4" />
+            Apply default care plan
+          </button>
+        )}
+      </div>
+      {hints.length > 0 && (
+        <dl className="grid gap-3 sm:grid-cols-2">
+          {hints.map(({ icon: Icon, label, value }) => (
+            <div key={label} className="flex items-start gap-2">
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
+              <div>
+                <dt className="text-sm font-medium">{label}</dt>
+                <dd className="text-sm text-stone-600">{value}</dd>
+              </div>
+            </div>
+          ))}
+        </dl>
+      )}
+      {species.common_issues && (
+        <div className={hints.length > 0 ? 'mt-4' : ''}>
+          <h3 className="mb-1 text-sm font-medium">Common issues & how to spot them</h3>
+          <p className="whitespace-pre-line text-sm text-stone-600">{species.common_issues}</p>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function PhotoGallery({ plantId, coverPhotoId }: { plantId: string; coverPhotoId: string | null }) {
   const { data: photos = [] } = usePhotos(plantId);
   const uploadPhoto = useUploadPhoto(plantId);
   const deletePhoto = useDeletePhoto(plantId);
   const setCover = useSetCoverPhoto(plantId);
+  const { notify } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(0);
+
+  const uploadFiles = async (files: FileList) => {
+    setUploading(files.length);
+    try {
+      // Sequential keeps the requests small-server friendly and the counter honest.
+      for (const file of Array.from(files)) {
+        await uploadPhoto.mutateAsync(file);
+        setUploading((count) => count - 1);
+      }
+    } finally {
+      setUploading(0);
+    }
+  };
 
   return (
     <section className="card p-5">
@@ -52,20 +163,20 @@ function PhotoGallery({ plantId, coverPhotoId }: { plantId: string; coverPhotoId
         <button
           type="button"
           className="btn-secondary"
-          disabled={uploadPhoto.isPending}
+          disabled={uploading > 0}
           onClick={() => fileInputRef.current?.click()}
         >
           <Camera className="h-4 w-4" />
-          Upload
+          {uploading > 0 ? `Uploading ${uploading}…` : 'Upload'}
         </button>
         <input
           ref={fileInputRef}
           type="file"
           accept="image/*"
+          multiple
           className="hidden"
           onChange={(event) => {
-            const file = event.target.files?.[0];
-            if (file) uploadPhoto.mutate(file);
+            if (event.target.files?.length) void uploadFiles(event.target.files);
             event.target.value = '';
           }}
         />
@@ -77,7 +188,8 @@ function PhotoGallery({ plantId, coverPhotoId }: { plantId: string; coverPhotoId
           {photos.map((photo) => (
             <div key={photo.id} className="group relative">
               <img src={thumbnailUrl(photo.id)} alt="" className="h-32 w-full rounded-lg object-cover" />
-              <div className="absolute inset-0 hidden items-end justify-between rounded-lg bg-black/30 p-2 group-hover:flex">
+              {/* Always visible on touch screens; hover/focus-revealed on desktop. */}
+              <div className="absolute inset-0 flex items-end justify-between rounded-lg bg-black/20 p-2 sm:bg-black/30 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
                 <button
                   type="button"
                   title={photo.id === coverPhotoId ? 'Current cover photo' : 'Set as cover photo'}
@@ -90,7 +202,12 @@ function PhotoGallery({ plantId, coverPhotoId }: { plantId: string; coverPhotoId
                   type="button"
                   title="Delete photo"
                   className="rounded bg-white/90 p-1.5 text-red-600 hover:bg-white"
-                  onClick={() => deletePhoto.mutate(photo.id)}
+                  onClick={() => {
+                    // Unlike logs/reminders, a photo can't be restored client-side.
+                    if (window.confirm('Delete this photo? This cannot be undone.')) {
+                      deletePhoto.mutate(photo.id, { onSuccess: () => notify('Photo deleted') });
+                    }
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -108,6 +225,8 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
   const [page, setPage] = useState(0);
   const { data: logs = [] } = useLogs(plantId, eventType || undefined, page);
   const deleteLog = useDeleteLog(plantId);
+  const createLog = useCreateLog(plantId);
+  const { notify } = useToast();
 
   return (
     <section className="card p-5">
@@ -142,7 +261,21 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
                 type="button"
                 title="Delete log entry"
                 className="text-stone-400 hover:text-red-600"
-                onClick={() => deleteLog.mutate(log.id)}
+                onClick={() =>
+                  deleteLog.mutate(log.id, {
+                    onSuccess: () =>
+                      // Undo recreates the entry with its original timestamp.
+                      notify(`${log.event_type} entry deleted`, 'success', {
+                        label: 'Undo',
+                        onClick: () =>
+                          createLog.mutate({
+                            event_type: log.event_type,
+                            notes: log.notes,
+                            logged_at: log.logged_at,
+                          }),
+                      }),
+                  })
+                }
               >
                 <Trash2 className="h-4 w-4" />
               </button>
@@ -167,12 +300,26 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
   );
 }
 
+// Matching the quick-action event types exactly is what links a reminder to
+// its care logs, so the picker offers them instead of free text (typo-proof);
+// "custom" still allows arbitrary event types.
+const CUSTOM_EVENT = '__custom__';
+
+function ReminderDueLabel({ dueAt, enabled }: { dueAt: string | null; enabled: boolean }) {
+  if (!enabled) return <span className="text-sm text-stone-400">paused</span>;
+  const label = formatDue(dueAt);
+  const overdue = !dueAt || new Date(dueAt).getTime() <= Date.now();
+  return <span className={`text-sm ${overdue ? 'font-medium text-red-600' : 'text-stone-500'}`}>{label}</span>;
+}
+
 function RemindersSection({ plantId }: { plantId: string }) {
   const { data: reminders = [] } = useReminders(plantId);
   const createReminder = useCreateReminder(plantId);
   const updateReminder = useUpdateReminder(plantId);
   const deleteReminder = useDeleteReminder(plantId);
-  const [eventType, setEventType] = useState('watering');
+  const { notify } = useToast();
+  const [eventChoice, setEventChoice] = useState('watering');
+  const [customEvent, setCustomEvent] = useState('');
   const [intervalDays, setIntervalDays] = useState(7);
 
   return (
@@ -183,10 +330,13 @@ function RemindersSection({ plantId }: { plantId: string }) {
       ) : (
         <ul className="mb-4 divide-y divide-stone-100">
           {reminders.map((reminder) => (
-            <li key={reminder.id} className="flex items-center justify-between py-2">
+            <li key={reminder.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div>
                 <span className="font-medium capitalize">{reminder.event_type}</span>
                 <span className="ml-2 text-sm text-stone-500">every {reminder.interval_days} days</span>
+                <span className="ml-3">
+                  <ReminderDueLabel dueAt={reminder.due_at ?? null} enabled={reminder.enabled} />
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1 text-sm text-stone-500">
@@ -203,7 +353,20 @@ function RemindersSection({ plantId }: { plantId: string }) {
                   type="button"
                   title="Delete reminder"
                   className="text-stone-400 hover:text-red-600"
-                  onClick={() => deleteReminder.mutate(reminder.id)}
+                  onClick={() =>
+                    deleteReminder.mutate(reminder.id, {
+                      onSuccess: () =>
+                        notify(`${reminder.event_type} reminder deleted`, 'success', {
+                          label: 'Undo',
+                          onClick: () =>
+                            createReminder.mutate({
+                              event_type: reminder.event_type,
+                              interval_days: reminder.interval_days,
+                              enabled: reminder.enabled,
+                            }),
+                        }),
+                    })
+                  }
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -216,13 +379,36 @@ function RemindersSection({ plantId }: { plantId: string }) {
         className="flex flex-wrap items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          createReminder.mutate({ event_type: eventType, interval_days: intervalDays, enabled: true });
+          const eventType = eventChoice === CUSTOM_EVENT ? customEvent.trim() : eventChoice;
+          if (!eventType) return;
+          createReminder.mutate(
+            { event_type: eventType, interval_days: intervalDays, enabled: true },
+            { onSuccess: () => setCustomEvent('') },
+          );
         }}
       >
         <div>
           <label className="mb-1 block text-xs text-stone-500">Event</label>
-          <input className="input-base w-36" value={eventType} onChange={(e) => setEventType(e.target.value)} />
+          <select className="input-base w-36" value={eventChoice} onChange={(e) => setEventChoice(e.target.value)}>
+            {QUICK_ACTIONS.map(({ eventType, label }) => (
+              <option key={eventType} value={eventType}>
+                {label}
+              </option>
+            ))}
+            <option value={CUSTOM_EVENT}>Custom…</option>
+          </select>
         </div>
+        {eventChoice === CUSTOM_EVENT && (
+          <div>
+            <label className="mb-1 block text-xs text-stone-500">Custom event</label>
+            <input
+              className="input-base w-36"
+              placeholder="misting"
+              value={customEvent}
+              onChange={(e) => setCustomEvent(e.target.value)}
+            />
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-xs text-stone-500">Every (days)</label>
           <input
@@ -258,7 +444,19 @@ export function PlantDetailPage() {
   const [customNotes, setCustomNotes] = useState('');
 
   if (isLoading || !plant) {
-    return <p className="text-stone-500">Loading plant…</p>;
+    return (
+      <div className="mx-auto flex max-w-4xl flex-col gap-6">
+        <div className="card overflow-hidden">
+          <Skeleton className="h-40 w-full rounded-none" />
+          <div className="flex flex-col gap-3 p-5">
+            <Skeleton className="h-7 w-1/3" />
+            <Skeleton className="h-4 w-1/2" />
+            <Skeleton className="h-10 w-2/3" />
+          </div>
+        </div>
+        <CardSkeleton lines={3} />
+      </div>
+    );
   }
 
   const locationName = locations.find((location) => location.id === plant.location_id)?.name;
@@ -277,7 +475,12 @@ export function PlantDetailPage() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold">{plant.name}</h1>
-              {plant.scientific_name && <p className="italic text-stone-500">{plant.scientific_name}</p>}
+              {(() => {
+                const speciesLabel = plant.species?.name ?? plant.species_name;
+                const scientific = plant.species?.scientific_name ?? plant.scientific_name;
+                const line = [speciesLabel, scientific].filter(Boolean).join(' · ');
+                return line ? <p className="italic text-stone-500">{line}</p> : null;
+              })()}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-stone-500">
                 {locationName && (
                   <span className="flex items-center gap-1">
@@ -344,7 +547,9 @@ export function PlantDetailPage() {
         </div>
       </div>
 
+      <CareGuide plant={plant} />
       <PhotoGallery plantId={plant.id} coverPhotoId={plant.cover_photo_id} />
+      <GrowthJournal plantId={plant.id} />
       <CareLogTimeline plantId={plant.id} />
       <RemindersSection plantId={plant.id} />
 

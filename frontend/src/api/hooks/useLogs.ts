@@ -32,6 +32,17 @@ export function useCreateLog(plantId: string) {
   });
 }
 
+// Cross-plant variant for the dashboard, where each row belongs to a
+// different plant so a per-plant hook instance won't do.
+export function useCreateLogForPlant() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ plantId, ...payload }: CareLogCreate & { plantId: string }) =>
+      api<CareLogRead>(`/api/v1/plants/${plantId}/logs`, { method: 'POST', ...jsonBody(payload) }),
+    onSuccess: (_data, { plantId }) => invalidateCareData(queryClient, plantId),
+  });
+}
+
 export function useDeleteLog(plantId: string) {
   const queryClient = useQueryClient();
   return useMutation({

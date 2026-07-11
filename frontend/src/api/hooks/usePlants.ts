@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, jsonBody } from '../client';
-import type { PlantCreate, PlantDetail, PlantListItem, PlantRead, PlantUpdate } from '../types';
+import type { PlantCreate, PlantDetail, PlantListItem, PlantRead, PlantUpdate, ReminderRead } from '../types';
 
 export interface PlantFilters {
   search?: string;
@@ -50,6 +50,17 @@ export function useDeletePlant() {
   return useMutation({
     mutationFn: (plantId: string) => api<void>(`/api/v1/plants/${plantId}`, { method: 'DELETE' }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['plants'] }),
+  });
+}
+
+export function useApplySpeciesDefaults(plantId: string) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<ReminderRead[]>(`/api/v1/plants/${plantId}/apply-species-defaults`, { method: 'POST' }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ['plants', plantId, 'reminders'] });
+      void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
+    },
   });
 }
 

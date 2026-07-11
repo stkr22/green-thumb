@@ -25,6 +25,8 @@ or `.env.local`.
 | `NTFY_URL` | no | — | ntfy server URL; notifications are skipped if unset |
 | `NTFY_TOPIC` | no | `greenthumb` | Default notification topic |
 | `NTFY_TOKEN` | no | — | ntfy bearer access token (see [ntfy](#ntfy-push-notifications)) |
+| `VAPID_PRIVATE_KEY` | no | — | Base64url EC private key enabling Web Push (see [Web Push](#web-push-notifications)); Web Push is disabled if unset |
+| `VAPID_SUBJECT` | no | `mailto:admin@example.com` | Contact URI sent to browser push services; set it to a real address |
 | `REMINDER_CHECK_INTERVAL_SECONDS` | no | `3600` | How often the reminder loop runs (min 60) |
 | `LOG_LEVEL` | no | `INFO` | Python log level |
 | `DEV_AUTH_BYPASS` | no | `false` | **Local only.** Enables `GET /auth/dev-login`; see [below](#dev-login-bypass-local-only) |
@@ -100,6 +102,40 @@ a down ntfy server won't break care logging or the reminder loop. Users can
 verify their own setup with **Send test notification** on the Profile page;
 operators can check the server config the same way (it returns `502` if ntfy
 rejects the publish).
+
+## Web Push notifications
+
+As an alternative (or addition) to ntfy, Green Thumb can deliver reminders as
+native browser notifications via the Web Push API — no extra app needed. The
+backend pushes directly to the browser vendors' push services, so it only
+needs outbound HTTPS; nothing new has to be reachable from the internet.
+
+Setup:
+
+1. Generate a VAPID private key and set it as `VAPID_PRIVATE_KEY`:
+
+   ```bash
+   uv run python -c "
+   import base64
+   from py_vapid import Vapid
+   v = Vapid(); v.generate_keys()
+   raw = v.private_key.private_numbers().private_value.to_bytes(32, 'big')
+   print(base64.urlsafe_b64encode(raw).rstrip(b'=').decode())"
+   ```
+
+   The public key is derived from it at runtime, so there is no second value
+   to keep in sync.
+
+2. Set `VAPID_SUBJECT` to a contact URI for the operator, e.g.
+   `mailto:you@example.com`.
+
+3. Each user enables notifications per device with **Enable on this device**
+   on their Profile page. On iOS the app must be installed to the home screen
+   first (Safari only allows push for installed web apps).
+
+Subscriptions whose endpoint has died (permission revoked, site data cleared)
+are pruned automatically when a push to them returns `404`/`410`. The app must
+be served over HTTPS for service workers — and therefore push — to work.
 
 ## Database & backups
 

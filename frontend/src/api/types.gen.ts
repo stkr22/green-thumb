@@ -183,6 +183,58 @@ export interface paths {
         patch: operations["update_location_api_v1_locations__location_id__patch"];
         trace?: never;
     };
+    "/api/v1/species": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Species
+         * @description List species with plant counts, optionally filtered by a name search term.
+         */
+        get: operations["list_species_api_v1_species_get"];
+        put?: never;
+        /**
+         * Create Species
+         * @description Create a species.
+         */
+        post: operations["create_species_api_v1_species_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/species/{species_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Species
+         * @description Fetch one species.
+         */
+        get: operations["get_species_api_v1_species__species_id__get"];
+        put?: never;
+        post?: never;
+        /**
+         * Delete Species
+         * @description Delete a species; plants that referenced it keep existing unlinked.
+         */
+        delete: operations["delete_species_api_v1_species__species_id__delete"];
+        options?: never;
+        head?: never;
+        /**
+         * Update Species
+         * @description Apply a partial update to a species.
+         */
+        patch: operations["update_species_api_v1_species__species_id__patch"];
+        trace?: never;
+    };
     "/api/v1/plants": {
         parameters: {
             query?: never;
@@ -198,7 +250,7 @@ export interface paths {
         put?: never;
         /**
          * Create Plant
-         * @description Create a plant.
+         * @description Create a plant; a linked species seeds reminders from its default intervals.
          */
         post: operations["create_plant_api_v1_plants_post"];
         delete?: never;
@@ -216,7 +268,7 @@ export interface paths {
         };
         /**
          * Get Plant
-         * @description Plant detail including the last care event per event type.
+         * @description Plant detail including the last care event per event type and the linked species.
          */
         get: operations["get_plant_api_v1_plants__plant_id__get"];
         put?: never;
@@ -233,6 +285,29 @@ export interface paths {
          * @description Apply a partial update to a plant.
          */
         patch: operations["update_plant_api_v1_plants__plant_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/plants/{plant_id}/apply-species-defaults": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Species Defaults
+         * @description Materialize the linked species' default intervals as reminders.
+         *
+         *     Existing reminders for the same event types are left untouched, so this is
+         *     safe to call repeatedly (e.g. after linking a species to an older plant).
+         */
+        post: operations["apply_species_defaults_api_v1_plants__plant_id__apply_species_defaults_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/plants/{plant_id}/cover": {
@@ -376,7 +451,7 @@ export interface paths {
         };
         /**
          * List Reminders
-         * @description List reminders configured for a plant.
+         * @description List reminders for a plant with their computed next-due timestamps.
          */
         get: operations["list_reminders_api_v1_plants__plant_id__reminders_get"];
         put?: never;
@@ -435,6 +510,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/push/public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Push Public Key
+         * @description VAPID public key for PushManager.subscribe(); null hides the push UI.
+         */
+        get: operations["get_push_public_key_api_v1_notifications_push_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Push Subscription
+         * @description Register (or re-register) this device's push subscription.
+         *
+         *     Upserts on the endpoint: browsers rotate subscription details and a
+         *     re-subscribe after clearing site data must not create duplicates.
+         */
+        post: operations["create_push_subscription_api_v1_notifications_push_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Push Subscription
+         * @description Remove a subscription by endpoint (idempotent: unknown endpoints 204).
+         */
+        post: operations["delete_push_subscription_api_v1_notifications_push_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/test": {
         parameters: {
             query?: never;
@@ -446,7 +584,7 @@ export interface paths {
         put?: never;
         /**
          * Send Test Notification
-         * @description Send a test notification to the current user's effective topic.
+         * @description Send a test notification over every channel the user has configured.
          */
         post: operations["send_test_notification_api_v1_notifications_test_post"];
         delete?: never;
@@ -632,6 +770,8 @@ export interface components {
         /**
          * PlantCreate
          * @description Payload to create a plant.
+         *
+         *     Linking a species materializes its default care intervals as reminders.
          */
         PlantCreate: {
             /** Name */
@@ -640,6 +780,8 @@ export interface components {
             species_name?: string | null;
             /** Scientific Name */
             scientific_name?: string | null;
+            /** Species Id */
+            species_id?: string | null;
             /** Location Id */
             location_id?: string | null;
             /** Notes */
@@ -649,7 +791,10 @@ export interface components {
         };
         /**
          * PlantDetail
-         * @description Plant detail: last care event per event type (e.g. watering/fertilising/repotting).
+         * @description Plant detail: last care event per event type, plus the linked species.
+         *
+         *     The species is embedded so the detail page can render care guidance
+         *     without a second request.
          */
         PlantDetail: {
             /**
@@ -663,6 +808,8 @@ export interface components {
             species_name: string | null;
             /** Scientific Name */
             scientific_name: string | null;
+            /** Species Id */
+            species_id: string | null;
             /** Location Id */
             location_id: string | null;
             /** Notes */
@@ -690,10 +837,14 @@ export interface components {
             last_events?: {
                 [key: string]: string;
             };
+            species?: components["schemas"]["SpeciesRead"] | null;
         };
         /**
          * PlantListItem
-         * @description Plant card data: includes the last watering for the 'X days ago' indicator.
+         * @description Plant card data.
+         *
+         *     Includes the last watering for the 'X days ago' indicator and the species
+         *     label resolved from the linked species or the free-text fallback.
          */
         PlantListItem: {
             /**
@@ -707,6 +858,8 @@ export interface components {
             species_name: string | null;
             /** Scientific Name */
             scientific_name: string | null;
+            /** Species Id */
+            species_id: string | null;
             /** Location Id */
             location_id: string | null;
             /** Notes */
@@ -732,6 +885,8 @@ export interface components {
             updated_at: string;
             /** Last Watered At */
             last_watered_at?: string | null;
+            /** Species Display Name */
+            species_display_name?: string | null;
         };
         /**
          * PlantRead
@@ -749,6 +904,8 @@ export interface components {
             species_name: string | null;
             /** Scientific Name */
             scientific_name: string | null;
+            /** Species Id */
+            species_id: string | null;
             /** Location Id */
             location_id: string | null;
             /** Notes */
@@ -784,12 +941,67 @@ export interface components {
             species_name?: string | null;
             /** Scientific Name */
             scientific_name?: string | null;
+            /** Species Id */
+            species_id?: string | null;
             /** Location Id */
             location_id?: string | null;
             /** Notes */
             notes?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /**
+         * PushKeys
+         * @description Client keys from PushManager.subscribe().
+         */
+        PushKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /**
+         * PushPublicKey
+         * @description VAPID application server key; null when Web Push is not configured.
+         */
+        PushPublicKey: {
+            /** Key */
+            key: string | null;
+        };
+        /**
+         * PushSubscriptionCreate
+         * @description A browser PushSubscription, in the shape subscription.toJSON() emits.
+         */
+        PushSubscriptionCreate: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushKeys"];
+        };
+        /**
+         * PushSubscriptionRead
+         * @description Stored subscription (keys omitted; the client never needs them back).
+         */
+        PushSubscriptionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Endpoint */
+            endpoint: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * PushUnsubscribe
+         * @description Payload to remove a subscription by its endpoint.
+         */
+        PushUnsubscribe: {
+            /** Endpoint */
+            endpoint: string;
         };
         /**
          * RecentCare
@@ -889,6 +1101,45 @@ export interface components {
             overdue: boolean;
         };
         /**
+         * ReminderStatusRead
+         * @description A reminder plus its computed schedule, for the plant detail page.
+         *
+         *     due_at is None when no matching care event exists yet — the reminder is
+         *     due immediately, matching the evaluator's overdue rule.
+         */
+        ReminderStatusRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Plant Id
+             * Format: uuid
+             */
+            plant_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Interval Days */
+            interval_days: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Notified At */
+            last_notified_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
+        };
+        /**
          * ReminderUpdate
          * @description Partial update for a reminder.
          */
@@ -899,6 +1150,166 @@ export interface components {
             interval_days?: number | null;
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /**
+         * SpeciesCreate
+         * @description Payload to create a species.
+         */
+        SpeciesCreate: {
+            /** Name */
+            name: string;
+            /** Scientific Name */
+            scientific_name?: string | null;
+            /** Light */
+            light?: string | null;
+            /** Watering Hint */
+            watering_hint?: string | null;
+            /** Soil Hint */
+            soil_hint?: string | null;
+            /**
+             * Deadheading
+             * @default false
+             */
+            deadheading: boolean;
+            /** Deadheading Hint */
+            deadheading_hint?: string | null;
+            /** Toxicity */
+            toxicity?: string | null;
+            /** Common Issues */
+            common_issues?: string | null;
+            /** Default Intervals */
+            default_intervals?: {
+                [key: string]: number;
+            };
+        };
+        /**
+         * SpeciesListItem
+         * @description Species list entry: includes how many plants reference it.
+         */
+        SpeciesListItem: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Scientific Name */
+            scientific_name: string | null;
+            /** Light */
+            light: string | null;
+            /** Watering Hint */
+            watering_hint: string | null;
+            /** Soil Hint */
+            soil_hint: string | null;
+            /** Deadheading */
+            deadheading: boolean;
+            /** Deadheading Hint */
+            deadheading_hint: string | null;
+            /** Toxicity */
+            toxicity: string | null;
+            /** Common Issues */
+            common_issues: string | null;
+            /** Default Intervals */
+            default_intervals: {
+                [key: string]: number;
+            };
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+            /**
+             * Plant Count
+             * @default 0
+             */
+            plant_count: number;
+        };
+        /**
+         * SpeciesRead
+         * @description Full species representation.
+         */
+        SpeciesRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Name */
+            name: string;
+            /** Scientific Name */
+            scientific_name: string | null;
+            /** Light */
+            light: string | null;
+            /** Watering Hint */
+            watering_hint: string | null;
+            /** Soil Hint */
+            soil_hint: string | null;
+            /** Deadheading */
+            deadheading: boolean;
+            /** Deadheading Hint */
+            deadheading_hint: string | null;
+            /** Toxicity */
+            toxicity: string | null;
+            /** Common Issues */
+            common_issues: string | null;
+            /** Default Intervals */
+            default_intervals: {
+                [key: string]: number;
+            };
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /**
+             * Updated At
+             * Format: date-time
+             */
+            updated_at: string;
+        };
+        /**
+         * SpeciesUpdate
+         * @description Partial update for a species; only provided fields are changed.
+         */
+        SpeciesUpdate: {
+            /** Name */
+            name?: string | null;
+            /** Scientific Name */
+            scientific_name?: string | null;
+            /** Light */
+            light?: string | null;
+            /** Watering Hint */
+            watering_hint?: string | null;
+            /** Soil Hint */
+            soil_hint?: string | null;
+            /** Deadheading */
+            deadheading?: boolean | null;
+            /** Deadheading Hint */
+            deadheading_hint?: string | null;
+            /** Toxicity */
+            toxicity?: string | null;
+            /** Common Issues */
+            common_issues?: string | null;
+            /** Default Intervals */
+            default_intervals?: {
+                [key: string]: number;
+            } | null;
         };
         /**
          * UserRead
@@ -1226,6 +1637,165 @@ export interface operations {
             };
         };
     };
+    list_species_api_v1_species_get: {
+        parameters: {
+            query?: {
+                search?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesListItem"][];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_species_api_v1_species_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeciesCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_species_api_v1_species__species_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                species_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_species_api_v1_species__species_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                species_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_species_api_v1_species__species_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                species_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SpeciesUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SpeciesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     list_plants_api_v1_plants_get: {
         parameters: {
             query?: {
@@ -1374,6 +1944,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PlantRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_species_defaults_api_v1_plants__plant_id__apply_species_defaults_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                plant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRead"][];
                 };
             };
             /** @description Validation Error */
@@ -1695,7 +2296,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReminderRead"][];
+                    "application/json": components["schemas"]["ReminderStatusRead"][];
                 };
             };
             /** @description Validation Error */
@@ -1827,6 +2428,90 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_push_public_key_api_v1_notifications_push_public_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushPublicKey"];
+                };
+            };
+        };
+    };
+    create_push_subscription_api_v1_notifications_push_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_push_subscription_api_v1_notifications_push_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribe"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
