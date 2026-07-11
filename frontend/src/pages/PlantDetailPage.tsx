@@ -34,7 +34,7 @@ import type { PlantDetail } from '../api/types';
 import { Modal } from '../components/Modal';
 import { PlantForm } from '../components/PlantForm';
 import { useToast } from '../components/Toast';
-import { formatDateTime, formatDaysAgo } from '../lib/dates';
+import { formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
 
 // `past` is spelled out rather than derived (e.g. `label + 'ed'`) because the
 // suffix rule breaks on "Fertilise" → "Fertiliseed" and "Repot" → "Repoted".
@@ -261,12 +261,25 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
   );
 }
 
+// Matching the quick-action event types exactly is what links a reminder to
+// its care logs, so the picker offers them instead of free text (typo-proof);
+// "custom" still allows arbitrary event types.
+const CUSTOM_EVENT = '__custom__';
+
+function ReminderDueLabel({ dueAt, enabled }: { dueAt: string | null; enabled: boolean }) {
+  if (!enabled) return <span className="text-sm text-stone-400">paused</span>;
+  const label = formatDue(dueAt);
+  const overdue = !dueAt || new Date(dueAt).getTime() <= Date.now();
+  return <span className={`text-sm ${overdue ? 'font-medium text-red-600' : 'text-stone-500'}`}>{label}</span>;
+}
+
 function RemindersSection({ plantId }: { plantId: string }) {
   const { data: reminders = [] } = useReminders(plantId);
   const createReminder = useCreateReminder(plantId);
   const updateReminder = useUpdateReminder(plantId);
   const deleteReminder = useDeleteReminder(plantId);
-  const [eventType, setEventType] = useState('watering');
+  const [eventChoice, setEventChoice] = useState('watering');
+  const [customEvent, setCustomEvent] = useState('');
   const [intervalDays, setIntervalDays] = useState(7);
 
   return (
@@ -277,10 +290,13 @@ function RemindersSection({ plantId }: { plantId: string }) {
       ) : (
         <ul className="mb-4 divide-y divide-stone-100">
           {reminders.map((reminder) => (
-            <li key={reminder.id} className="flex items-center justify-between py-2">
+            <li key={reminder.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div>
                 <span className="font-medium capitalize">{reminder.event_type}</span>
                 <span className="ml-2 text-sm text-stone-500">every {reminder.interval_days} days</span>
+                <span className="ml-3">
+                  <ReminderDueLabel dueAt={reminder.due_at ?? null} enabled={reminder.enabled} />
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1 text-sm text-stone-500">
@@ -310,13 +326,36 @@ function RemindersSection({ plantId }: { plantId: string }) {
         className="flex flex-wrap items-end gap-2"
         onSubmit={(event) => {
           event.preventDefault();
-          createReminder.mutate({ event_type: eventType, interval_days: intervalDays, enabled: true });
+          const eventType = eventChoice === CUSTOM_EVENT ? customEvent.trim() : eventChoice;
+          if (!eventType) return;
+          createReminder.mutate(
+            { event_type: eventType, interval_days: intervalDays, enabled: true },
+            { onSuccess: () => setCustomEvent('') },
+          );
         }}
       >
         <div>
           <label className="mb-1 block text-xs text-stone-500">Event</label>
-          <input className="input-base w-36" value={eventType} onChange={(e) => setEventType(e.target.value)} />
+          <select className="input-base w-36" value={eventChoice} onChange={(e) => setEventChoice(e.target.value)}>
+            {QUICK_ACTIONS.map(({ eventType, label }) => (
+              <option key={eventType} value={eventType}>
+                {label}
+              </option>
+            ))}
+            <option value={CUSTOM_EVENT}>Custom…</option>
+          </select>
         </div>
+        {eventChoice === CUSTOM_EVENT && (
+          <div>
+            <label className="mb-1 block text-xs text-stone-500">Custom event</label>
+            <input
+              className="input-base w-36"
+              placeholder="misting"
+              value={customEvent}
+              onChange={(e) => setCustomEvent(e.target.value)}
+            />
+          </div>
+        )}
         <div>
           <label className="mb-1 block text-xs text-stone-500">Every (days)</label>
           <input

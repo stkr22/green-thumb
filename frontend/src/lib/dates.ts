@@ -13,6 +13,17 @@ export function formatDaysAgo(iso: string | null | undefined): string {
   return `${days} days ago`;
 }
 
+/** Human label for a reminder's next due timestamp (null = no matching event yet). */
+export function formatDue(iso: string | null | undefined): string {
+  if (!iso) return 'due now (never logged)';
+  const msLeft = new Date(iso).getTime() - Date.now();
+  const days = Math.ceil(msLeft / (24 * 60 * 60 * 1000));
+  if (days < 0) return `${-days} ${days === -1 ? 'day' : 'days'} overdue`;
+  if (days === 0) return 'due today';
+  if (days === 1) return 'due tomorrow';
+  return `due in ${days} days`;
+}
+
 export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }

@@ -1,12 +1,12 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { api, jsonBody } from '../client';
-import type { ReminderCreate, ReminderRead, ReminderUpdate } from '../types';
+import type { ReminderCreate, ReminderRead, ReminderStatusRead, ReminderUpdate } from '../types';
 
 export function useReminders(plantId: string) {
   return useQuery({
     queryKey: ['plants', plantId, 'reminders'],
-    queryFn: () => api<ReminderRead[]>(`/api/v1/plants/${plantId}/reminders`),
+    queryFn: () => api<ReminderStatusRead[]>(`/api/v1/plants/${plantId}/reminders`),
   });
 }
 

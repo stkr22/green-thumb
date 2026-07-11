@@ -22,6 +22,7 @@ export type SpeciesListItem = components['schemas']['SpeciesListItem'];
 export type SpeciesCreate = components['schemas']['SpeciesCreate'];
 export type SpeciesUpdate = components['schemas']['SpeciesUpdate'];
 export type ReminderRead = components['schemas']['ReminderRead'];
+export type ReminderStatusRead = components['schemas']['ReminderStatusRead'];
 export type ReminderCreate = components['schemas']['ReminderCreate'];
 export type ReminderUpdate = components['schemas']['ReminderUpdate'];
 export type ReminderStatus = components['schemas']['ReminderStatus'];

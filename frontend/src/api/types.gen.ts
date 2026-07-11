@@ -451,7 +451,7 @@ export interface paths {
         };
         /**
          * List Reminders
-         * @description List reminders configured for a plant.
+         * @description List reminders for a plant with their computed next-due timestamps.
          */
         get: operations["list_reminders_api_v1_plants__plant_id__reminders_get"];
         put?: never;
@@ -983,6 +983,45 @@ export interface components {
             due_at: string | null;
             /** Overdue */
             overdue: boolean;
+        };
+        /**
+         * ReminderStatusRead
+         * @description A reminder plus its computed schedule, for the plant detail page.
+         *
+         *     due_at is None when no matching care event exists yet — the reminder is
+         *     due immediately, matching the evaluator's overdue rule.
+         */
+        ReminderStatusRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /**
+             * Plant Id
+             * Format: uuid
+             */
+            plant_id: string;
+            /** Event Type */
+            event_type: string;
+            /** Interval Days */
+            interval_days: number;
+            /** Enabled */
+            enabled: boolean;
+            /** Last Notified At */
+            last_notified_at: string | null;
+            /**
+             * Created By
+             * Format: uuid
+             */
+            created_by: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Due At */
+            due_at?: string | null;
         };
         /**
          * ReminderUpdate
@@ -2141,7 +2180,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["ReminderRead"][];
+                    "application/json": components["schemas"]["ReminderStatusRead"][];
                 };
             };
             /** @description Validation Error */
