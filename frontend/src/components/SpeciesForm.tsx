@@ -153,7 +153,14 @@ export function SpeciesForm({ initial, submitLabel, busy, onSubmit }: SpeciesFor
           {INTERVAL_FIELDS.map(({ key, label }) => (
             <div key={key}>
               <label className="mb-1 block text-xs text-stone-500">{label}</label>
-              <input type="number" min={1} max={3650} className="input-base w-28" {...form.register(key)} />
+              <input
+                type="number"
+                min={1}
+                max={3650}
+                aria-label={`${label} interval`}
+                className="input-base w-28"
+                {...form.register(key)}
+              />
             </div>
           ))}
         </div>

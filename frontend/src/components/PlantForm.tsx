@@ -85,7 +85,7 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
         <div>
           <label className="mb-1 block text-sm font-medium">Species</label>
           <div className="flex gap-2">
-            <select className="input-base" {...form.register('species_id')}>
+            <select className="input-base" aria-label="Species" {...form.register('species_id')}>
               <option value="">No species</option>
               {speciesList.map((species) => (
                 <option key={species.id} value={species.id}>
@@ -128,7 +128,7 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
 
         <div>
           <label className="mb-1 block text-sm font-medium">Location</label>
-          <select className="input-base" {...form.register('location_id')}>
+          <select className="input-base" aria-label="Location" {...form.register('location_id')}>
             <option value="">No location</option>
             {locations.map((location) => (
               <option key={location.id} value={location.id}>

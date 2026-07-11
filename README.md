@@ -15,13 +15,18 @@ with SSO login through [Zitadel](https://zitadel.com).
 ## Features
 
 - **Plants** with species, scientific name, location, tags, notes, and photos
+- **Species library** — shared care profiles (light/water/soil advice,
+  deadheading, toxicity, common illnesses) with default care plans that seed
+  each plant's reminders
 - **Locations** (rooms / areas) with plant counts
 - **Care logging** — watering, fertilising, repotting, or custom events (backdatable)
 - **Reminders** — get notified when a plant hasn't had a care event within N days
-- **Dashboard** — overdue and upcoming care at a glance
+- **Dashboard** — overdue and upcoming care at a glance, with one-tap quick-log
 - **Calendar** — monthly view of upcoming care
-- **Photos** — gallery per plant, with a selectable cover photo
-- **Push notifications** via ntfy, with a per-user topic override
+- **Photos & growth journal** — gallery per plant with a selectable cover photo,
+  plus a merged photo/care timeline
+- **Installable PWA** with native **Web Push** notifications and/or ntfy
+  (per-user topic override)
 - **SSO login** through Zitadel (OIDC); no passwords stored by the app
 
 > **Single shared household instance.** Every signed-in user sees and can edit

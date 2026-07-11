@@ -17,7 +17,7 @@ test('create a location, then a plant in it', async ({ page }) => {
   await page.goto('/plants/new');
   await page.getByPlaceholder('My Monstera').fill(plantName);
   await page.getByPlaceholder('tropical, low-light').fill('succulent, easy-care');
-  await page.getByRole('combobox').selectOption({ label: locationName });
+  await page.getByRole('combobox', { name: 'Location' }).selectOption({ label: locationName });
   await page.getByRole('button', { name: 'Create plant' }).click();
 
   // Redirected to the new plant's detail page.

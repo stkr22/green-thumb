@@ -4,7 +4,7 @@
 
 Self-hosted plant care tracker (see SPEC.md and docs/, with an overview in README.md):
 
-- `src/greenthumb/` – FastAPI backend: SQLModel (async + aiosqlite), OIDC auth via Zitadel, ntfy notifications
+- `src/greenthumb/` – FastAPI backend: SQLModel (async + aiosqlite), OIDC auth via Zitadel, ntfy + Web Push (pywebpush/VAPID) notifications
 - `alembic/` – database migrations (SQLite; verify with `uv run alembic upgrade head` against a temp SQLite file)
 - `tests/` – pytest suite against in-memory SQLite (foreign_keys pragma on)
 - `frontend/` – React 19 + TypeScript + Vite + Tailwind 4 + TanStack Query 5 SPA (`cd frontend && npm run build` to type-check and build; `npm run test:e2e` for Playwright e2e in `frontend/e2e/`, which starts its own backend + frontend with an isolated SQLite DB and the dev-login bypass)
