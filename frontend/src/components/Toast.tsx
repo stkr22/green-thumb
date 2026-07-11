@@ -8,14 +8,20 @@ import { X } from 'lucide-react';
 
 type ToastKind = 'error' | 'success';
 
+interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  action?: ToastAction;
 }
 
 interface ToastContextValue {
-  notify: (message: string, kind?: ToastKind) => void;
+  notify: (message: string, kind?: ToastKind, action?: ToastAction) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -37,10 +43,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
 
-  const notify = useCallback((message: string, kind: ToastKind = 'success') => {
+  const notify = useCallback((message: string, kind: ToastKind = 'success', action?: ToastAction) => {
     const id = nextId.current++;
-    setToasts((current) => [...current, { id, kind, message }]);
-    setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), 5000);
+    setToasts((current) => [...current, { id, kind, message, action }]);
+    // Toasts with an action (e.g. Undo) stay longer so users can react.
+    setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), action ? 8000 : 5000);
   }, []);
 
   useEffect(() => {
@@ -63,7 +70,19 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
             }`}
           >
-            <span>{toast.message}</span>
+            <span className="flex-1">{toast.message}</span>
+            {toast.action && (
+              <button
+                type="button"
+                className="shrink-0 rounded bg-white/20 px-2 py-0.5 font-semibold hover:bg-white/30"
+                onClick={() => {
+                  toast.action?.onClick();
+                  setToasts((current) => current.filter((item) => item.id !== toast.id));
+                }}
+              >
+                {toast.action.label}
+              </button>
+            )}
             <button
               type="button"
               aria-label="Dismiss"

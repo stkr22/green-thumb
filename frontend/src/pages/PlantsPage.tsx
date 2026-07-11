@@ -4,12 +4,26 @@ import { Plus, Search } from 'lucide-react';
 
 import { useLocations } from '../api/hooks/useLocations';
 import { usePlants } from '../api/hooks/usePlants';
+import type { PlantListItem } from '../api/types';
 import { PlantCard } from '../components/PlantCard';
+import { PlantCardSkeleton } from '../components/Skeleton';
+
+type SortKey = 'name' | 'thirstiest' | 'recently_watered';
+
+// The API returns name order; the other sorts are client-side because the
+// whole collection is already loaded (homelab-sized).
+function sortPlants(plants: PlantListItem[], sort: SortKey): PlantListItem[] {
+  if (sort === 'name') return plants;
+  const time = (plant: PlantListItem) =>
+    plant.last_watered_at ? new Date(plant.last_watered_at).getTime() : 0; // never watered = thirstiest
+  return [...plants].sort((a, b) => (sort === 'thirstiest' ? time(a) - time(b) : time(b) - time(a)));
+}
 
 export function PlantsPage() {
   const [search, setSearch] = useState('');
   const [locationId, setLocationId] = useState('');
   const [tag, setTag] = useState('');
+  const [sort, setSort] = useState<SortKey>('name');
   const { data: plants = [], isLoading } = usePlants({
     search: search || undefined,
     locationId: locationId || undefined,
@@ -23,6 +37,7 @@ export function PlantsPage() {
   );
   // Offer every tag currently in use as a filter option.
   const allTags = useMemo(() => [...new Set(plants.flatMap((plant) => plant.tags))].sort(), [plants]);
+  const sortedPlants = useMemo(() => sortPlants(plants, sort), [plants, sort]);
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -60,15 +75,29 @@ export function PlantsPage() {
             </option>
           ))}
         </select>
+        <select
+          className="input-base w-48"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortKey)}
+          aria-label="Sort plants"
+        >
+          <option value="name">Sort by name</option>
+          <option value="thirstiest">Longest unwatered first</option>
+          <option value="recently_watered">Recently watered first</option>
+        </select>
       </div>
 
       {isLoading ? (
-        <p className="text-stone-500">Loading plants…</p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {Array.from({ length: 8 }, (_, index) => (
+            <PlantCardSkeleton key={index} />
+          ))}
+        </div>
       ) : plants.length === 0 ? (
         <p className="text-stone-500">No plants found. Add your first plant to get started.</p>
       ) : (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {plants.map((plant) => (
+          {sortedPlants.map((plant) => (
             <PlantCard
               key={plant.id}
               plant={plant}

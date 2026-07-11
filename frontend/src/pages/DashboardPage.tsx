@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin } from 'luc
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useCreateLogForPlant } from '../api/hooks/useLogs';
 import type { ReminderStatus } from '../api/types';
+import { CardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { formatDate, formatDaysAgo } from '../lib/dates';
 
@@ -76,7 +77,18 @@ export function DashboardPage() {
   const { data, isLoading } = useDashboard();
 
   if (isLoading || !data) {
-    return <p className="text-stone-500">Loading dashboard…</p>;
+    return (
+      <div className="mx-auto max-w-5xl">
+        <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+        <div className="grid gap-6 lg:grid-cols-2">
+          <CardSkeleton lines={3} />
+          <CardSkeleton lines={3} />
+          <div className="lg:col-span-2">
+            <CardSkeleton lines={4} />
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
