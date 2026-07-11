@@ -1,24 +1,74 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarClock, Droplets, Leaf, MapPin } from 'lucide-react';
+import { AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
+import { useCreateLogForPlant } from '../api/hooks/useLogs';
 import type { ReminderStatus } from '../api/types';
+import { useToast } from '../components/Toast';
 import { formatDate, formatDaysAgo } from '../lib/dates';
 
 function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red' | 'amber' }) {
+  const createLog = useCreateLogForPlant();
+  const { notify } = useToast();
+
   return (
     <Link
       to={`/plants/${status.plant_id}`}
-      className="flex items-center justify-between rounded-lg px-3 py-2 hover:bg-stone-50"
+      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-stone-50"
     >
-      <div>
+      <div className="min-w-0">
         <span className="font-medium">{status.plant_name}</span>
         <span className="ml-2 text-sm text-stone-500">{status.event_type}</span>
       </div>
-      <span className={`text-sm ${accent === 'red' ? 'text-red-600' : 'text-amber-600'}`}>
-        {status.due_at ? `due ${formatDate(status.due_at)}` : 'never logged'}
-      </span>
+      <div className="flex shrink-0 items-center gap-2">
+        <span className={`text-sm ${accent === 'red' ? 'text-red-600' : 'text-amber-600'}`}>
+          {status.due_at ? `due ${formatDate(status.due_at)}` : 'never logged'}
+        </span>
+        <button
+          type="button"
+          title={`Log ${status.event_type} for ${status.plant_name}`}
+          className="btn-secondary px-2 py-1"
+          disabled={createLog.isPending}
+          onClick={(event) => {
+            // Rendered inside the row's <Link>: don't navigate, just log.
+            event.preventDefault();
+            event.stopPropagation();
+            createLog.mutate(
+              { plantId: status.plant_id, event_type: status.event_type },
+              { onSuccess: () => notify(`${status.event_type} logged for ${status.plant_name}`) },
+            );
+          }}
+        >
+          <Check className="h-4 w-4" />
+          Done
+        </button>
+      </div>
     </Link>
+  );
+}
+
+function WaterAllButton({ overdue }: { overdue: ReminderStatus[] }) {
+  const createLog = useCreateLogForPlant();
+  const { notify } = useToast();
+  // One plant can have several overdue reminders; watering is per plant.
+  const plants = [...new Map(overdue.filter((s) => s.event_type === 'watering').map((s) => [s.plant_id, s])).values()];
+  if (plants.length < 2) return null;
+
+  return (
+    <button
+      type="button"
+      className="btn-secondary"
+      disabled={createLog.isPending}
+      onClick={async () => {
+        for (const status of plants) {
+          await createLog.mutateAsync({ plantId: status.plant_id, event_type: 'watering' });
+        }
+        notify(`Watering logged for ${plants.length} plants`);
+      }}
+    >
+      <Droplets className="h-4 w-4 text-sky-500" />
+      Water all ({plants.length})
+    </button>
   );
 }
 
@@ -52,10 +102,13 @@ export function DashboardPage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card p-5">
-          <h2 className="mb-3 flex items-center gap-2 font-semibold">
-            <AlertTriangle className="h-5 w-5 text-red-500" />
-            Overdue
-          </h2>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <AlertTriangle className="h-5 w-5 text-red-500" />
+              Overdue
+            </h2>
+            <WaterAllButton overdue={data.overdue} />
+          </div>
           {data.overdue.length === 0 ? (
             <p className="text-sm text-stone-500">Nothing overdue. Your plants are happy.</p>
           ) : (
