@@ -1,4 +1,4 @@
-"""Reminder evaluation: compute due state and send ntfy notifications.
+"""Reminder evaluation: compute due state and send notifications (ntfy + Web Push).
 
 The same status computation backs the dashboard endpoint and the daily
 background loop, so both always agree on what counts as overdue.
@@ -10,10 +10,10 @@ from datetime import datetime, timedelta
 from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
-from greenthumb.models import CareLog, Plant, Reminder, User
+from greenthumb.models import CareLog, Plant, PushSubscription, Reminder, User
 from greenthumb.models.base import ensure_utc, utcnow
 from greenthumb.schemas import ReminderStatus
-from greenthumb.services import ntfy
+from greenthumb.services import ntfy, webpush
 
 logger = logging.getLogger(__name__)
 
@@ -95,11 +95,13 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
     Reminders are batched into a single notification so users aren't flooded when
     several plants come due at once. Each reminder is re-included only after
     interval_days / 2 has passed since its last notification, so an ignored
-    reminder doesn't reappear in every digest.
+    reminder doesn't reappear in every digest. The digest goes out over both
+    channels a user may have: ntfy (opt-in flag) and Web Push (per device).
     """
     now = utcnow()
-    recipients = list((await session.exec(select(User).where(col(User.ntfy_enabled).is_(True)))).all())
-    if not recipients:
+    ntfy_recipients = list((await session.exec(select(User).where(col(User.ntfy_enabled).is_(True)))).all())
+    push_subscriptions = list((await session.exec(select(PushSubscription))).all())
+    if not ntfy_recipients and not push_subscriptions:
         return 0
 
     due: list[tuple[Reminder, ReminderStatus]] = []
@@ -118,12 +120,15 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
 
     title, message = _build_digest([status for _, status in due])
     sent = 0
-    delivered = False
-    for user in recipients:
-        ok = await ntfy.send_notification(title=title, message=message, topic=user.ntfy_topic_override)
-        delivered = delivered or ok
-        sent += int(ok)
-    if delivered:
+    for user in ntfy_recipients:
+        sent += int(await ntfy.send_notification(title=title, message=message, topic=user.ntfy_topic_override))
+    for subscription in push_subscriptions:
+        result = await webpush.send_notification(subscription, title=title, message=message)
+        if result is webpush.PushResult.GONE:
+            # Permission revoked or site data cleared; the endpoint is dead forever.
+            await session.delete(subscription)
+        sent += int(result is webpush.PushResult.SENT)
+    if sent:
         for reminder, _ in due:
             reminder.last_notified_at = now
             session.add(reminder)

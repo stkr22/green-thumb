@@ -21,3 +21,29 @@ registerRoute(
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') void self.skipWaiting();
 });
+
+// Web Push: the backend sends {title, body} JSON (see services/webpush.py).
+self.addEventListener('push', (event) => {
+  const data = (event.data?.json() ?? {}) as { title?: string; body?: string };
+  event.waitUntil(
+    self.registration.showNotification(data.title ?? 'Green Thumb', {
+      body: data.body ?? '',
+      icon: '/icons/icon-192.png',
+      badge: '/icons/icon-192.png',
+      // One digest replaces the previous one instead of stacking up.
+      tag: 'greenthumb-reminders',
+    }),
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
+      const open = clients.find((client): client is WindowClient => 'focus' in client);
+      // The dashboard lists what's overdue, which is what the digest is about.
+      if (open) return open.navigate('/').then((c) => c?.focus());
+      return self.clients.openWindow('/');
+    }),
+  );
+});

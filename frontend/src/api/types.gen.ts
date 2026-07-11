@@ -510,6 +510,69 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/push/public-key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Push Public Key
+         * @description VAPID public key for PushManager.subscribe(); null hides the push UI.
+         */
+        get: operations["get_push_public_key_api_v1_notifications_push_public_key_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Create Push Subscription
+         * @description Register (or re-register) this device's push subscription.
+         *
+         *     Upserts on the endpoint: browsers rotate subscription details and a
+         *     re-subscribe after clearing site data must not create duplicates.
+         */
+        post: operations["create_push_subscription_api_v1_notifications_push_subscriptions_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/notifications/push/unsubscribe": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Delete Push Subscription
+         * @description Remove a subscription by endpoint (idempotent: unknown endpoints 204).
+         */
+        post: operations["delete_push_subscription_api_v1_notifications_push_unsubscribe_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/notifications/test": {
         parameters: {
             query?: never;
@@ -521,7 +584,7 @@ export interface paths {
         put?: never;
         /**
          * Send Test Notification
-         * @description Send a test notification to the current user's effective topic.
+         * @description Send a test notification over every channel the user has configured.
          */
         post: operations["send_test_notification_api_v1_notifications_test_post"];
         delete?: never;
@@ -886,6 +949,59 @@ export interface components {
             notes?: string | null;
             /** Tags */
             tags?: string[] | null;
+        };
+        /**
+         * PushKeys
+         * @description Client keys from PushManager.subscribe().
+         */
+        PushKeys: {
+            /** P256Dh */
+            p256dh: string;
+            /** Auth */
+            auth: string;
+        };
+        /**
+         * PushPublicKey
+         * @description VAPID application server key; null when Web Push is not configured.
+         */
+        PushPublicKey: {
+            /** Key */
+            key: string | null;
+        };
+        /**
+         * PushSubscriptionCreate
+         * @description A browser PushSubscription, in the shape subscription.toJSON() emits.
+         */
+        PushSubscriptionCreate: {
+            /** Endpoint */
+            endpoint: string;
+            keys: components["schemas"]["PushKeys"];
+        };
+        /**
+         * PushSubscriptionRead
+         * @description Stored subscription (keys omitted; the client never needs them back).
+         */
+        PushSubscriptionRead: {
+            /**
+             * Id
+             * Format: uuid
+             */
+            id: string;
+            /** Endpoint */
+            endpoint: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+        };
+        /**
+         * PushUnsubscribe
+         * @description Payload to remove a subscription by its endpoint.
+         */
+        PushUnsubscribe: {
+            /** Endpoint */
+            endpoint: string;
         };
         /**
          * RecentCare
@@ -2312,6 +2428,90 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["DashboardSummary"];
                 };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_push_public_key_api_v1_notifications_push_public_key_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushPublicKey"];
+                };
+            };
+        };
+    };
+    create_push_subscription_api_v1_notifications_push_subscriptions_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushSubscriptionCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PushSubscriptionRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    delete_push_subscription_api_v1_notifications_push_unsubscribe_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PushUnsubscribe"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

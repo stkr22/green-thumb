@@ -27,3 +27,5 @@ export type ReminderCreate = components['schemas']['ReminderCreate'];
 export type ReminderUpdate = components['schemas']['ReminderUpdate'];
 export type ReminderStatus = components['schemas']['ReminderStatus'];
 export type DashboardSummary = components['schemas']['DashboardSummary'];
+export type PushPublicKey = components['schemas']['PushPublicKey'];
+export type PushSubscriptionRead = components['schemas']['PushSubscriptionRead'];
