@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.8.0](https://github.com/stkr22/green-thumb/compare/v0.7.0...v0.8.0) (2026-07-11)
+
+
+### Features
+
+* **dashboard:** act on overdue care without leaving the dashboard ([2ea4306](https://github.com/stkr22/green-thumb/commit/2ea4306b8dc736df6edc74873111415ed48647e3))
+* **journal:** growth journal on the plant detail page ([38e0557](https://github.com/stkr22/green-thumb/commit/38e0557cb001e2f44181fb969bcbc46273270700))
+* **push:** native Web Push notifications alongside ntfy ([2788e2a](https://github.com/stkr22/green-thumb/commit/2788e2a453577b34063fa76146f503b24024533b))
+* **pwa:** installable app with offline shell ([d4ba45f](https://github.com/stkr22/green-thumb/commit/d4ba45f5082a9aa81d997f092eb23fb085b65f75))
+* **reminders:** typed event picker and next-due display ([7125ff2](https://github.com/stkr22/green-thumb/commit/7125ff2a299ce6a73c063a01895e06f5bbe19cca))
+* **species:** shared species library with care profiles and default care plans ([a36a96f](https://github.com/stkr22/green-thumb/commit/a36a96fc834486c690ec2f10d66d18d18aebee1e))
+* **ux:** safer deletes, sorting, accessible modals and photo controls ([a5b6855](https://github.com/stkr22/green-thumb/commit/a5b68556bfa45c623bf7af9bc23c6b6f0d8f81ec))
+
+
+### Documentation
+
+* cover species, PWA, web push, journal and dashboard quick actions ([d803a3c](https://github.com/stkr22/green-thumb/commit/d803a3cd1799d8b1052abcbf9be4786f715a40d5))
+
 ## [0.7.0](https://github.com/stkr22/green-thumb/compare/v0.6.0...v0.7.0) (2026-06-29)
 
 
