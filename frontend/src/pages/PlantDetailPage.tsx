@@ -31,6 +31,7 @@ import {
 } from '../api/hooks/usePlants';
 import { useCreateReminder, useDeleteReminder, useReminders, useUpdateReminder } from '../api/hooks/useReminders';
 import type { PlantDetail } from '../api/types';
+import { GrowthJournal } from '../components/GrowthJournal';
 import { Modal } from '../components/Modal';
 import { PlantForm } from '../components/PlantForm';
 import { CardSkeleton, Skeleton } from '../components/Skeleton';
@@ -548,6 +549,7 @@ export function PlantDetailPage() {
 
       <CareGuide plant={plant} />
       <PhotoGallery plantId={plant.id} coverPhotoId={plant.cover_photo_id} />
+      <GrowthJournal plantId={plant.id} />
       <CareLogTimeline plantId={plant.id} />
       <RemindersSection plantId={plant.id} />
 
