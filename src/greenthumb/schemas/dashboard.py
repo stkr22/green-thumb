@@ -19,6 +19,9 @@ class ReminderStatus(SQLModel):
     # due_at is None when the plant has no matching care log yet - the reminder
     # is treated as immediately overdue in that case.
     overdue: bool
+    # While set and in the future, due_at is at least this value, so the UI can
+    # label the deferral instead of showing the reminder as overdue.
+    snoozed_until: datetime | None = None
 
 
 class RecentCare(SQLModel):

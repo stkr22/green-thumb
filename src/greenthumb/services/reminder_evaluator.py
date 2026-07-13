@@ -5,6 +5,8 @@ background loop, so both always agree on what counts as overdue.
 """
 
 import logging
+import uuid
+from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from sqlmodel import col, func, select
@@ -22,8 +24,23 @@ logger = logging.getLogger(__name__)
 _EVENT_VERBS = {"watering": "water", "fertilising": "fertilise", "repotting": "repot"}
 
 
+def effective_due_at(
+    last_event_at: datetime | None, interval_days: int, snoozed_until: datetime | None
+) -> datetime | None:
+    """Next due timestamp: last event + interval, deferred to snoozed_until when that is later.
+
+    None means due immediately (no matching care log and no snooze). A snooze
+    earlier than the regular schedule is a no-op rather than moving the due
+    date forward.
+    """
+    due = last_event_at + timedelta(days=interval_days) if last_event_at else None
+    if snoozed_until is not None and (due is None or snoozed_until > due):
+        due = snoozed_until
+    return due
+
+
 async def _reminder_rows(
-    session: AsyncSession, *, enabled_only: bool = True
+    session: AsyncSession, *, enabled_only: bool = True, plant_ids: Iterable[uuid.UUID] | None = None
 ) -> list[tuple[Reminder, str, datetime | None]]:
     """Fetch reminders with plant name and the latest matching care log timestamp."""
     last_log = (
@@ -45,6 +62,8 @@ async def _reminder_rows(
     )
     if enabled_only:
         statement = statement.where(col(Reminder.enabled).is_(True))
+    if plant_ids is not None:
+        statement = statement.where(col(Reminder.plant_id).in_(list(plant_ids)))
     return list((await session.exec(statement)).all())
 
 
@@ -52,7 +71,8 @@ def _status_for(reminder: Reminder, plant_name: str, last_at: datetime | None) -
     """Derive the due state for one reminder."""
     now = utcnow()
     last_event_at = ensure_utc(last_at) if last_at is not None else None
-    due_at = last_event_at + timedelta(days=reminder.interval_days) if last_event_at else None
+    snoozed_until = ensure_utc(reminder.snoozed_until) if reminder.snoozed_until is not None else None
+    due_at = effective_due_at(last_event_at, reminder.interval_days, snoozed_until)
     return ReminderStatus(
         reminder_id=reminder.id,
         plant_id=reminder.plant_id,
@@ -62,6 +82,7 @@ def _status_for(reminder: Reminder, plant_name: str, last_at: datetime | None) -
         last_event_at=last_event_at,
         due_at=due_at,
         overdue=due_at is None or due_at <= now,
+        snoozed_until=snoozed_until,
     )
 
 
@@ -70,6 +91,23 @@ async def compute_reminder_statuses(session: AsyncSession) -> list[ReminderStatu
     return [
         _status_for(reminder, plant_name, last_at) for reminder, plant_name, last_at in await _reminder_rows(session)
     ]
+
+
+async def due_event_types(session: AsyncSession, plant_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, list[str]]:
+    """Map plant id -> event types of enabled reminders currently overdue (snooze-aware).
+
+    Backs the due chips on plant cards with a single grouped query instead of
+    per-plant status lookups.
+    """
+    ids = list(plant_ids)
+    if not ids:
+        return {}
+    due: dict[uuid.UUID, list[str]] = {}
+    for reminder, plant_name, last_at in await _reminder_rows(session, plant_ids=ids):
+        status = _status_for(reminder, plant_name, last_at)
+        if status.overdue:
+            due.setdefault(status.plant_id, []).append(status.event_type)
+    return due
 
 
 def _digest_line(status: ReminderStatus) -> str:
@@ -151,4 +189,10 @@ async def overdue_and_upcoming(
     return overdue, upcoming
 
 
-__all__ = ["compute_reminder_statuses", "evaluate_and_notify", "overdue_and_upcoming"]
+__all__ = [
+    "compute_reminder_statuses",
+    "due_event_types",
+    "effective_due_at",
+    "evaluate_and_notify",
+    "overdue_and_upcoming",
+]

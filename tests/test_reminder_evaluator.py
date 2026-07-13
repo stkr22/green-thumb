@@ -132,3 +132,31 @@ async def test_reminder_without_any_log_notifies(
 
     assert await reminder_evaluator.evaluate_and_notify(session) == 1
     assert "Repot Monstera (no repotting recorded yet)" in sent_notifications[0]["message"]
+
+
+async def test_snoozed_reminder_does_not_notify(
+    session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
+):
+    user.ntfy_enabled = True
+    session.add(user)
+    reminder = await _make_overdue_reminder(session, plant, user)
+    reminder.snoozed_until = datetime.now(UTC) + timedelta(days=3)
+    session.add(reminder)
+    await session.commit()
+
+    assert await reminder_evaluator.evaluate_and_notify(session) == 0
+    assert sent_notifications == []
+
+
+async def test_notifies_after_snooze_expires(
+    session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
+):
+    user.ntfy_enabled = True
+    session.add(user)
+    reminder = await _make_overdue_reminder(session, plant, user)
+    reminder.snoozed_until = datetime.now(UTC) - timedelta(hours=1)
+    session.add(reminder)
+    await session.commit()
+
+    assert await reminder_evaluator.evaluate_and_notify(session) == 1
+    assert len(sent_notifications) == 1

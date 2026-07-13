@@ -22,5 +22,11 @@ class Reminder(SQLModel, table=True):
     # Dedup marker: re-notify only after interval_days / 2 has passed since the
     # last notification, so an ignored reminder doesn't spam every hour.
     last_notified_at: datetime | None = Field(default=None, sa_column=Column(utc_datetime_type(), nullable=True))
+    # User-initiated deferral ("due but not needed, e.g. soil still wet"). While
+    # set, the effective due date is max(last log + interval, snoozed_until), so
+    # the reminder neither shows as overdue nor notifies. Cleared when a care
+    # log of this event_type is created, since the snooze must not outlive an
+    # actual care event.
+    snoozed_until: datetime | None = Field(default=None, sa_column=Column(utc_datetime_type(), nullable=True))
     created_by: uuid.UUID = Field(foreign_key="users.id")
     created_at: datetime = Field(default_factory=utcnow, sa_column=Column(utc_datetime_type(), nullable=False))

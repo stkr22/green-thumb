@@ -1,8 +1,11 @@
 """Care log API tests."""
 
-import httpx
+from datetime import UTC, datetime, timedelta
 
-from greenthumb.models import Plant
+import httpx
+from sqlmodel.ext.asyncio.session import AsyncSession
+
+from greenthumb.models import Plant, Reminder, User
 
 
 async def test_create_log_defaults_logged_at(client: httpx.AsyncClient, plant: Plant):
@@ -37,3 +40,26 @@ async def test_delete_log(client: httpx.AsyncClient, plant: Plant):
     log_id = (await client.post(f"/api/v1/plants/{plant.id}/logs", json={"event_type": "watering"})).json()["id"]
     assert (await client.delete(f"/api/v1/logs/{log_id}")).status_code == 204
     assert (await client.get(f"/api/v1/plants/{plant.id}/logs")).json() == []
+
+
+async def test_create_log_clears_matching_snooze(
+    client: httpx.AsyncClient, session: AsyncSession, plant: Plant, user: User
+):
+    snoozed_until = datetime.now(UTC) + timedelta(days=30)
+    watering = Reminder(
+        plant_id=plant.id, event_type="watering", interval_days=7, snoozed_until=snoozed_until, created_by=user.id
+    )
+    fertilising = Reminder(
+        plant_id=plant.id, event_type="fertilising", interval_days=30, snoozed_until=snoozed_until, created_by=user.id
+    )
+    session.add(watering)
+    session.add(fertilising)
+    await session.commit()
+
+    assert (await client.post(f"/api/v1/plants/{plant.id}/logs", json={"event_type": "watering"})).status_code == 201
+
+    await session.refresh(watering)
+    await session.refresh(fertilising)
+    assert watering.snoozed_until is None
+    # Other event types keep their snooze.
+    assert fertilising.snoozed_until is not None

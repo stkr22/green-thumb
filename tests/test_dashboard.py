@@ -82,3 +82,29 @@ async def test_dashboard_upcoming_days_widens_horizon(
     assert default_window["upcoming"] == []
     month_window = (await client.get("/api/v1/dashboard", params={"upcoming_days": 30})).json()
     assert len(month_window["upcoming"]) == 1
+
+
+async def test_dashboard_snoozed_reminder_moves_to_upcoming(
+    client: httpx.AsyncClient, session: AsyncSession, plant: Plant, user: User
+):
+    now = datetime.now(UTC)
+    # Watered 10 days ago with a 7-day interval -> overdue, then snoozed 3 days.
+    snoozed_until = now + timedelta(days=3)
+    session.add(
+        Reminder(
+            plant_id=plant.id,
+            event_type="watering",
+            interval_days=7,
+            snoozed_until=snoozed_until,
+            created_by=user.id,
+        )
+    )
+    await add_care_log(session, plant.id, user.id, logged_at=now - timedelta(days=10))
+    await session.commit()
+
+    body = (await client.get("/api/v1/dashboard")).json()
+    assert body["overdue"] == []
+    assert len(body["upcoming"]) == 1
+    status = body["upcoming"][0]
+    assert datetime.fromisoformat(status["due_at"]) == snoozed_until
+    assert datetime.fromisoformat(status["snoozed_until"]) == snoozed_until
