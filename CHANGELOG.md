@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.9.0](https://github.com/stkr22/green-thumb/compare/v0.8.0...v0.9.0) (2026-07-13)
+
+
+### Features
+
+* **plants:** expose due care events on the plants list ([7be1f8e](https://github.com/stkr22/green-thumb/commit/7be1f8e4b589b6561d323b534af65e27943ec6db))
+* **reminders:** snooze due care actions ([4d0f6f5](https://github.com/stkr22/green-thumb/commit/4d0f6f5698271bf1c867dd8f5927d35d4acb195d))
+* **web:** color-code care events and flag due care on plant cards ([a4731f3](https://github.com/stkr22/green-thumb/commit/a4731f3b0911f10c851fba67ba7889ca73fe996d))
+* **web:** merge care display+actions into tappable cards, add snooze UI ([58f0211](https://github.com/stkr22/green-thumb/commit/58f0211fe17d8d62c5f1c24f60a3728c44099642))
+
 ## [0.8.0](https://github.com/stkr22/green-thumb/compare/v0.7.0...v0.8.0) (2026-07-11)
 
 
