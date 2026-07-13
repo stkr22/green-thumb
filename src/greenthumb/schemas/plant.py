@@ -61,6 +61,9 @@ class PlantListItem(PlantRead):
 
     last_watered_at: datetime | None = None
     species_display_name: str | None = None
+    # Event types of enabled reminders currently overdue (snooze-aware), so
+    # cards can flag due care without a per-plant request.
+    due_events: list[str] = Field(default_factory=list)
 
 
 class PlantDetail(PlantRead):

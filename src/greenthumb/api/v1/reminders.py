@@ -9,8 +9,10 @@ from sqlmodel import select
 from greenthumb.api.v1.deps import get_plant_or_404
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Reminder
-from greenthumb.schemas import ReminderCreate, ReminderRead, ReminderStatusRead, ReminderUpdate
+from greenthumb.models.base import ensure_utc, utcnow
+from greenthumb.schemas import ReminderCreate, ReminderRead, ReminderSnooze, ReminderStatusRead, ReminderUpdate
 from greenthumb.services import care
+from greenthumb.services.reminder_evaluator import effective_due_at
 
 router = APIRouter(tags=["reminders"])
 
@@ -24,7 +26,8 @@ async def list_reminders(plant_id: uuid.UUID, session: SessionDep, _user: Curren
     result = []
     for reminder in reminders:
         last = last_events.get(reminder.event_type)
-        due_at = last + timedelta(days=reminder.interval_days) if last else None
+        snoozed = ensure_utc(reminder.snoozed_until) if reminder.snoozed_until is not None else None
+        due_at = effective_due_at(last, reminder.interval_days, snoozed)
         result.append(ReminderStatusRead(**reminder.model_dump(), due_at=due_at))
     return result
 
@@ -66,3 +69,31 @@ async def delete_reminder(reminder_id: uuid.UUID, session: SessionDep, _user: Cu
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reminder not found")
     await session.delete(reminder)
     await session.commit()
+
+
+@router.post("/reminders/{reminder_id}/snooze", response_model=ReminderRead)
+async def snooze_reminder(
+    reminder_id: uuid.UUID, payload: ReminderSnooze, session: SessionDep, _user: CurrentUser
+) -> Reminder:
+    """Defer a reminder ("due but not needed"); defaults to one full interval from now."""
+    reminder = await session.get(Reminder, reminder_id)
+    if reminder is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reminder not found")
+    reminder.snoozed_until = utcnow() + timedelta(days=payload.days or reminder.interval_days)
+    session.add(reminder)
+    await session.commit()
+    await session.refresh(reminder)
+    return reminder
+
+
+@router.delete("/reminders/{reminder_id}/snooze", response_model=ReminderRead)
+async def unsnooze_reminder(reminder_id: uuid.UUID, session: SessionDep, _user: CurrentUser) -> Reminder:
+    """Cancel an active snooze, restoring the regular schedule."""
+    reminder = await session.get(Reminder, reminder_id)
+    if reminder is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reminder not found")
+    reminder.snoozed_until = None
+    session.add(reminder)
+    await session.commit()
+    await session.refresh(reminder)
+    return reminder

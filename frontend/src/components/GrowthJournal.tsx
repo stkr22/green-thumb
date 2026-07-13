@@ -3,11 +3,12 @@
 // this is purely a different lens on it.
 
 import { useQuery } from '@tanstack/react-query';
-import { BookOpen, Droplets, FlaskConical, Shovel, Sparkles } from 'lucide-react';
+import { BookOpen } from 'lucide-react';
 
 import { api, photoUrl, thumbnailUrl } from '../api/client';
 import { usePhotos } from '../api/hooks/usePhotos';
 import type { CareLogRead, PhotoRead } from '../api/types';
+import { careEventStyle } from '../lib/careEvents';
 import { formatDate } from '../lib/dates';
 
 const JOURNAL_LOG_LIMIT = 500;
@@ -23,12 +24,6 @@ function useJournalLogs(plantId: string) {
 type Entry =
   | { at: string; kind: 'photo'; photo: PhotoRead }
   | { at: string; kind: 'event'; log: CareLogRead };
-
-const EVENT_ICONS: Record<string, typeof Droplets> = {
-  watering: Droplets,
-  fertilising: FlaskConical,
-  repotting: Shovel,
-};
 
 function monthLabel(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
@@ -77,8 +72,8 @@ export function GrowthJournal({ plantId }: { plantId: string }) {
                 ) : (
                   <li key={`log-${entry.log.id}`} className="flex items-start gap-2">
                     {(() => {
-                      const Icon = EVENT_ICONS[entry.log.event_type] ?? Sparkles;
-                      return <Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />;
+                      const event = careEventStyle(entry.log.event_type);
+                      return <event.Icon className={`mt-0.5 h-4 w-4 shrink-0 ${event.icon}`} />;
                     })()}
                     <div className="text-sm">
                       <span className="font-medium capitalize">{entry.log.event_type}</span>

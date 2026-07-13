@@ -19,7 +19,7 @@ from greenthumb.schemas import (
     ReminderRead,
     SpeciesRead,
 )
-from greenthumb.services import care
+from greenthumb.services import care, reminder_evaluator
 from greenthumb.services.species import materialize_default_reminders
 
 router = APIRouter(prefix="/plants", tags=["plants"])
@@ -72,6 +72,7 @@ async def list_plants(
         # operator and collections are homelab-sized.
         plants = [plant for plant in plants if tag in plant.tags]
     watered = await care.last_watered_map(session, (plant.id for plant in plants))
+    due_map = await reminder_evaluator.due_event_types(session, (plant.id for plant in plants))
     species_ids = {plant.species_id for plant in plants if plant.species_id}
     species_names: dict[uuid.UUID, str] = {}
     if species_ids:
@@ -83,6 +84,7 @@ async def list_plants(
             last_watered_at=watered.get(plant.id),
             species_display_name=(species_names.get(plant.species_id) if plant.species_id else None)
             or plant.species_name,
+            due_events=due_map.get(plant.id, []),
         )
         for plant in plants
     ]

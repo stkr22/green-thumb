@@ -11,6 +11,8 @@ export function useReminders(plantId: string) {
 }
 
 function invalidateReminderData(queryClient: ReturnType<typeof useQueryClient>, plantId: string): void {
+  // The broad ['plants'] key also refreshes due_events on the plant cards.
+  void queryClient.invalidateQueries({ queryKey: ['plants'] });
   void queryClient.invalidateQueries({ queryKey: ['plants', plantId, 'reminders'] });
   void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
 }
@@ -38,5 +40,25 @@ export function useDeleteReminder(plantId: string) {
   return useMutation({
     mutationFn: (id: string) => api<void>(`/api/v1/reminders/${id}`, { method: 'DELETE' }),
     onSuccess: () => invalidateReminderData(queryClient, plantId),
+  });
+}
+
+// Cross-plant like useCreateLogForPlant: dashboard rows span plants, so the
+// plant id rides along per call purely for cache invalidation.
+export function useSnoozeReminder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reminderId, days }: { reminderId: string; plantId: string; days?: number }) =>
+      api<ReminderRead>(`/api/v1/reminders/${reminderId}/snooze`, { method: 'POST', ...jsonBody({ days }) }),
+    onSuccess: (_data, { plantId }) => invalidateReminderData(queryClient, plantId),
+  });
+}
+
+export function useUnsnoozeReminder() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ reminderId }: { reminderId: string; plantId: string }) =>
+      api<ReminderRead>(`/api/v1/reminders/${reminderId}/snooze`, { method: 'DELETE' }),
+    onSuccess: (_data, { plantId }) => invalidateReminderData(queryClient, plantId),
   });
 }

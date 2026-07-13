@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
 import type { ReminderStatus } from '../api/types';
+import { CareEventChip } from '../components/CareEventChip';
 import { dateKey } from '../lib/dates';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
@@ -121,9 +122,10 @@ export function CalendarPage() {
                   className="flex items-center justify-between px-2 py-2 hover:bg-stone-50"
                 >
                   <span className="font-medium">{status.plant_name}</span>
-                  <span className="text-sm capitalize text-stone-500">
-                    {status.event_type}
-                    {status.overdue && <span className="ml-2 text-red-600">overdue</span>}
+                  <span className="flex items-center gap-2 text-sm">
+                    <CareEventChip eventType={status.event_type} />
+                    {status.overdue && <span className="text-red-600">overdue</span>}
+                    {!status.overdue && status.snoozed_until && <span className="text-stone-400">snoozed</span>}
                   </span>
                 </Link>
               </li>

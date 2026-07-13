@@ -1,11 +1,13 @@
 import type { MouseEvent } from 'react';
 import { Link } from 'react-router-dom';
-import { Droplets, FlaskConical, Leaf, MapPin } from 'lucide-react';
+import { Droplets, Leaf, MapPin } from 'lucide-react';
 
 import { thumbnailUrl } from '../api/client';
 import { useCreateLog } from '../api/hooks/useLogs';
 import type { PlantListItem } from '../api/types';
+import { CareEventChip } from './CareEventChip';
 import { useToast } from './Toast';
+import { careEventStyle } from '../lib/careEvents';
 import { formatDaysAgo } from '../lib/dates';
 
 interface PlantCardProps {
@@ -50,6 +52,15 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
             {plant.last_watered_at ? `watered ${formatDaysAgo(plant.last_watered_at)}` : 'never watered'}
           </span>
         </div>
+        {(plant.due_events ?? []).length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {(plant.due_events ?? []).map((eventType) => (
+              <CareEventChip key={eventType} eventType={eventType}>
+                {careEventStyle(eventType).verb} due
+              </CareEventChip>
+            ))}
+          </div>
+        )}
         {plant.tags.length > 0 && (
           <div className="mt-2 flex flex-wrap gap-1">
             {plant.tags.map((tag) => (
@@ -60,24 +71,21 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
           </div>
         )}
         <div className="mt-3 flex gap-2">
-          <button
-            type="button"
-            className="btn-secondary flex-1"
-            disabled={createLog.isPending}
-            onClick={(event) => quickLog(event, 'watering', 'Water')}
-          >
-            <Droplets className="h-4 w-4 text-sky-500" />
-            Water
-          </button>
-          <button
-            type="button"
-            className="btn-secondary flex-1"
-            disabled={createLog.isPending}
-            onClick={(event) => quickLog(event, 'fertilising', 'Fertilise')}
-          >
-            <FlaskConical className="h-4 w-4 text-emerald-600" />
-            Fertilise
-          </button>
+          {['watering', 'fertilising'].map((eventType) => {
+            const event = careEventStyle(eventType);
+            return (
+              <button
+                key={eventType}
+                type="button"
+                className="btn-secondary flex-1"
+                disabled={createLog.isPending}
+                onClick={(e) => quickLog(e, eventType, event.verb)}
+              >
+                <event.Icon className={`h-4 w-4 ${event.icon}`} />
+                {event.verb}
+              </button>
+            );
+          })}
         </div>
       </div>
     </Link>

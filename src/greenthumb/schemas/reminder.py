@@ -22,6 +22,12 @@ class ReminderUpdate(SQLModel):
     enabled: bool | None = None
 
 
+class ReminderSnooze(SQLModel):
+    """Payload to snooze a reminder; omitting days defers by the reminder's own interval."""
+
+    days: int | None = Field(default=None, gt=0, le=3650)
+
+
 class ReminderRead(SQLModel):
     """A reminder as stored."""
 
@@ -31,6 +37,7 @@ class ReminderRead(SQLModel):
     interval_days: int
     enabled: bool
     last_notified_at: datetime | None
+    snoozed_until: datetime | None
     created_by: uuid.UUID
     created_at: datetime
 

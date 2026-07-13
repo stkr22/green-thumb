@@ -8,7 +8,7 @@ from sqlmodel import col, select
 
 from greenthumb.api.v1.deps import get_plant_or_404
 from greenthumb.auth import CurrentUser, SessionDep
-from greenthumb.models import CareLog
+from greenthumb.models import CareLog, Reminder
 from greenthumb.models.base import utcnow
 from greenthumb.schemas import CareLogCreate, CareLogRead
 
@@ -45,6 +45,18 @@ async def create_log(plant_id: uuid.UUID, payload: CareLogCreate, session: Sessi
         logged_by=user.id,
     )
     session.add(log)
+    # A snooze must not outlive an actual care event: without this, a snooze
+    # further out than log + interval would keep deferring the next due date.
+    snoozed = await session.exec(
+        select(Reminder).where(
+            Reminder.plant_id == plant_id,
+            Reminder.event_type == payload.event_type,
+            col(Reminder.snoozed_until).is_not(None),
+        )
+    )
+    for reminder in snoozed:
+        reminder.snoozed_until = None
+        session.add(reminder)
     await session.commit()
     await session.refresh(log)
     return log

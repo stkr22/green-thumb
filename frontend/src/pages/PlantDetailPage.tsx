@@ -1,10 +1,11 @@
 import { useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
+  AlarmClock,
+  AlarmClockOff,
   BellPlus,
   Camera,
   Droplets,
-  FlaskConical,
   Leaf,
   MapPin,
   Pencil,
@@ -29,35 +30,93 @@ import {
   useSetCoverPhoto,
   useUpdatePlant,
 } from '../api/hooks/usePlants';
-import { useCreateReminder, useDeleteReminder, useReminders, useUpdateReminder } from '../api/hooks/useReminders';
-import type { PlantDetail } from '../api/types';
+import {
+  useCreateReminder,
+  useDeleteReminder,
+  useReminders,
+  useSnoozeReminder,
+  useUnsnoozeReminder,
+  useUpdateReminder,
+} from '../api/hooks/useReminders';
+import type { PlantDetail, ReminderStatusRead } from '../api/types';
+import { CareEventChip } from '../components/CareEventChip';
 import { GrowthJournal } from '../components/GrowthJournal';
 import { Modal } from '../components/Modal';
 import { PlantForm } from '../components/PlantForm';
 import { CardSkeleton, Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
+import { DEFAULT_CARE_EVENTS } from '../lib/careEvents';
+import { formatDate, formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
 
-// `past` is spelled out rather than derived (e.g. `label + 'ed'`) because the
-// suffix rule breaks on "Fertilise" → "Fertiliseed" and "Repot" → "Repoted".
-const QUICK_ACTIONS = [
-  { eventType: 'watering', label: 'Water', past: 'Watered', icon: Droplets },
-  { eventType: 'fertilising', label: 'Fertilise', past: 'Fertilised', icon: FlaskConical },
-  { eventType: 'repotting', label: 'Repot', past: 'Repotted', icon: Shovel },
-];
+const DUE_SOON_MS = 2 * 24 * 60 * 60 * 1000;
 
-function CareSummary({ plant }: { plant: PlantDetail }) {
+function isSnoozed(reminder: ReminderStatusRead | undefined): boolean {
+  return Boolean(reminder?.snoozed_until && new Date(reminder.snoozed_until).getTime() > Date.now());
+}
+
+// One tappable card per default care type. The "last done" display and the
+// log buttons used to be separate elements, which invited taps on the read-only
+// half; merging them makes the whole card the action, with an Undo toast as
+// the safety net for accidental taps.
+function CareActions({ plant, onCustom }: { plant: PlantDetail; onCustom: () => void }) {
+  const createLog = useCreateLog(plant.id);
+  const deleteLog = useDeleteLog(plant.id);
+  const { data: reminders = [] } = useReminders(plant.id);
+  const { notify } = useToast();
+
   return (
-    <div className="flex flex-wrap gap-4">
-      {QUICK_ACTIONS.map(({ eventType, past, icon: Icon }) => (
-        <div key={eventType} className="card flex items-center gap-3 px-4 py-3">
-          <Icon className="h-5 w-5 text-emerald-600" />
-          <div>
-            <p className="text-sm font-medium">{past}</p>
-            <p className="text-sm text-stone-500">{formatDaysAgo(plant.last_events?.[eventType])}</p>
-          </div>
-        </div>
-      ))}
+    <div>
+      <div className="grid grid-cols-3 gap-2">
+        {DEFAULT_CARE_EVENTS.map((event) => {
+          const reminder = reminders.find((r) => r.event_type === event.eventType && r.enabled);
+          const snoozed = isSnoozed(reminder);
+          const msLeft = reminder?.due_at ? new Date(reminder.due_at).getTime() - Date.now() : null;
+          const overdue = reminder !== undefined && (msLeft === null || msLeft <= 0);
+          const dueSoon = msLeft !== null && msLeft > 0 && msLeft <= DUE_SOON_MS;
+          return (
+            <button
+              key={event.eventType}
+              type="button"
+              className="card flex flex-col items-start gap-1 p-3 text-left transition hover:shadow-md disabled:opacity-50"
+              disabled={createLog.isPending}
+              onClick={() =>
+                createLog.mutate(
+                  { event_type: event.eventType },
+                  {
+                    onSuccess: (log) =>
+                      notify(`${event.pastTense}`, 'success', {
+                        label: 'Undo',
+                        onClick: () => deleteLog.mutate(log.id),
+                      }),
+                  },
+                )
+              }
+            >
+              <span className={`rounded-full p-1.5 ${event.chip}`}>
+                <event.Icon className="h-4 w-4" />
+              </span>
+              <span className="text-sm font-medium">{event.verb}</span>
+              <span className="text-xs text-stone-500">
+                {event.pastTense} {formatDaysAgo(plant.last_events?.[event.eventType])}
+              </span>
+              {reminder &&
+                (snoozed ? (
+                  <span className="text-xs text-stone-400">snoozed</span>
+                ) : overdue ? (
+                  <span className="text-xs font-medium text-red-600">{formatDue(reminder.due_at ?? null)}</span>
+                ) : dueSoon ? (
+                  <span className="text-xs font-medium text-amber-600">{formatDue(reminder.due_at)}</span>
+                ) : null)}
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-2">
+        <button type="button" className="btn-secondary" onClick={onCustom}>
+          <Plus className="h-4 w-4" />
+          Custom
+        </button>
+      </div>
     </div>
   );
 }
@@ -241,9 +300,11 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
           }}
         >
           <option value="">All events</option>
-          <option value="watering">Watering</option>
-          <option value="fertilising">Fertilising</option>
-          <option value="repotting">Repotting</option>
+          {DEFAULT_CARE_EVENTS.map((event) => (
+            <option key={event.eventType} value={event.eventType}>
+              {event.label}
+            </option>
+          ))}
         </select>
       </div>
       {logs.length === 0 ? (
@@ -253,9 +314,11 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
           {logs.map((log) => (
             <li key={log.id} className="flex items-center justify-between py-2">
               <div>
-                <span className="font-medium capitalize">{log.event_type}</span>
-                <span className="ml-3 text-sm text-stone-500">{formatDateTime(log.logged_at)}</span>
-                {log.notes && <p className="text-sm text-stone-500">{log.notes}</p>}
+                <div className="flex flex-wrap items-center gap-2">
+                  <CareEventChip eventType={log.event_type} />
+                  <span className="text-sm text-stone-500">{formatDateTime(log.logged_at)}</span>
+                </div>
+                {log.notes && <p className="mt-1 text-sm text-stone-500">{log.notes}</p>}
               </div>
               <button
                 type="button"
@@ -305,8 +368,19 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
 // "custom" still allows arbitrary event types.
 const CUSTOM_EVENT = '__custom__';
 
-function ReminderDueLabel({ dueAt, enabled }: { dueAt: string | null; enabled: boolean }) {
+function ReminderDueLabel({
+  dueAt,
+  enabled,
+  snoozedUntil,
+}: {
+  dueAt: string | null;
+  enabled: boolean;
+  snoozedUntil: string | null;
+}) {
   if (!enabled) return <span className="text-sm text-stone-400">paused</span>;
+  if (snoozedUntil && new Date(snoozedUntil).getTime() > Date.now()) {
+    return <span className="text-sm text-stone-400">snoozed until {formatDate(snoozedUntil)}</span>;
+  }
   const label = formatDue(dueAt);
   const overdue = !dueAt || new Date(dueAt).getTime() <= Date.now();
   return <span className={`text-sm ${overdue ? 'font-medium text-red-600' : 'text-stone-500'}`}>{label}</span>;
@@ -317,6 +391,8 @@ function RemindersSection({ plantId }: { plantId: string }) {
   const createReminder = useCreateReminder(plantId);
   const updateReminder = useUpdateReminder(plantId);
   const deleteReminder = useDeleteReminder(plantId);
+  const snoozeReminder = useSnoozeReminder();
+  const unsnoozeReminder = useUnsnoozeReminder();
   const { notify } = useToast();
   const [eventChoice, setEventChoice] = useState('watering');
   const [customEvent, setCustomEvent] = useState('');
@@ -331,12 +407,14 @@ function RemindersSection({ plantId }: { plantId: string }) {
         <ul className="mb-4 divide-y divide-stone-100">
           {reminders.map((reminder) => (
             <li key={reminder.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div>
-                <span className="font-medium capitalize">{reminder.event_type}</span>
-                <span className="ml-2 text-sm text-stone-500">every {reminder.interval_days} days</span>
-                <span className="ml-3">
-                  <ReminderDueLabel dueAt={reminder.due_at ?? null} enabled={reminder.enabled} />
-                </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <CareEventChip eventType={reminder.event_type} />
+                <span className="text-sm text-stone-500">every {reminder.interval_days} days</span>
+                <ReminderDueLabel
+                  dueAt={reminder.due_at ?? null}
+                  enabled={reminder.enabled}
+                  snoozedUntil={reminder.snoozed_until ?? null}
+                />
               </div>
               <div className="flex items-center gap-2">
                 <label className="flex items-center gap-1 text-sm text-stone-500">
@@ -349,6 +427,38 @@ function RemindersSection({ plantId }: { plantId: string }) {
                   />
                   enabled
                 </label>
+                {isSnoozed(reminder) ? (
+                  <button
+                    type="button"
+                    title="Cancel snooze"
+                    className="text-stone-400 hover:text-emerald-600"
+                    disabled={unsnoozeReminder.isPending}
+                    onClick={() => unsnoozeReminder.mutate({ reminderId: reminder.id, plantId })}
+                  >
+                    <AlarmClockOff className="h-4 w-4" />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    title={`Snooze for ${reminder.interval_days} days`}
+                    className="text-stone-400 hover:text-emerald-600"
+                    disabled={snoozeReminder.isPending}
+                    onClick={() =>
+                      snoozeReminder.mutate(
+                        { reminderId: reminder.id, plantId },
+                        {
+                          onSuccess: () =>
+                            notify(`${reminder.event_type} snoozed for ${reminder.interval_days} days`, 'success', {
+                              label: 'Undo',
+                              onClick: () => unsnoozeReminder.mutate({ reminderId: reminder.id, plantId }),
+                            }),
+                        },
+                      )
+                    }
+                  >
+                    <AlarmClock className="h-4 w-4" />
+                  </button>
+                )}
                 <button
                   type="button"
                   title="Delete reminder"
@@ -390,7 +500,7 @@ function RemindersSection({ plantId }: { plantId: string }) {
         <div>
           <label className="mb-1 block text-xs text-stone-500">Event</label>
           <select className="input-base w-36" value={eventChoice} onChange={(e) => setEventChoice(e.target.value)}>
-            {QUICK_ACTIONS.map(({ eventType, label }) => (
+            {DEFAULT_CARE_EVENTS.map(({ eventType, label }) => (
               <option key={eventType} value={eventType}>
                 {label}
               </option>
@@ -521,28 +631,7 @@ export function PlantDetailPage() {
           </div>
 
           <div className="mt-5">
-            <CareSummary plant={plant} />
-          </div>
-
-          <div className="mt-5 flex flex-wrap gap-2">
-            {QUICK_ACTIONS.map(({ eventType, label, icon: Icon }) => (
-              <button
-                key={eventType}
-                type="button"
-                className="btn-primary"
-                disabled={createLog.isPending}
-                onClick={() =>
-                  createLog.mutate({ event_type: eventType }, { onSuccess: () => notify(`${label} logged`) })
-                }
-              >
-                <Icon className="h-4 w-4" />
-                {label}
-              </button>
-            ))}
-            <button type="button" className="btn-secondary" onClick={() => setCustomLogOpen(true)}>
-              <Plus className="h-4 w-4" />
-              Custom
-            </button>
+            <CareActions plant={plant} onCustom={() => setCustomLogOpen(true)} />
           </div>
         </div>
       </div>

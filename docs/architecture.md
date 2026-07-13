@@ -96,6 +96,10 @@ reminder it finds the most recent matching care log and computes due state:
 
 - **Overdue** when there is no matching care log, or `now - last_logged_at >
   interval_days`.
+- **Snooze:** a user can defer a due reminder (`snoozed_until`); the effective
+  due date is `max(last log + interval, snoozed_until)`, so a snoozed reminder
+  is neither overdue nor notified until the snooze expires. Logging a matching
+  care event clears the snooze — it must never outlive a real care event.
 - Overdue reminders are pushed via ntfy to every user with `ntfy_enabled =
   true`, using each user's topic override or the global `NTFY_TOPIC`.
 - **De-duplication:** after notifying, `last_notified_at` is stamped on the

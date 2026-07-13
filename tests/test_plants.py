@@ -55,6 +55,35 @@ async def test_list_plants_includes_last_watered(
     assert item["last_watered_at"].startswith("2026-06-01T12:00:00")
 
 
+async def test_list_plants_due_events(client: httpx.AsyncClient, session: AsyncSession, plant: Plant, user: User):
+    # Overdue watering (never logged), disabled repotting must not appear.
+    session.add(Reminder(plant_id=plant.id, event_type="watering", interval_days=7, created_by=user.id))
+    session.add(
+        Reminder(plant_id=plant.id, event_type="repotting", interval_days=365, enabled=False, created_by=user.id)
+    )
+    await session.commit()
+
+    item = (await client.get("/api/v1/plants")).json()[0]
+    assert item["due_events"] == ["watering"]
+
+    # Logging the event clears the due flag.
+    await client.post(f"/api/v1/plants/{plant.id}/logs", json={"event_type": "watering"})
+    item = (await client.get("/api/v1/plants")).json()[0]
+    assert item["due_events"] == []
+
+
+async def test_list_plants_due_events_respects_snooze(
+    client: httpx.AsyncClient, session: AsyncSession, plant: Plant, user: User
+):
+    reminder = Reminder(plant_id=plant.id, event_type="watering", interval_days=7, created_by=user.id)
+    session.add(reminder)
+    await session.commit()
+
+    assert (await client.get("/api/v1/plants")).json()[0]["due_events"] == ["watering"]
+    await client.post(f"/api/v1/reminders/{reminder.id}/snooze", json={})
+    assert (await client.get("/api/v1/plants")).json()[0]["due_events"] == []
+
+
 async def test_plant_detail_last_events(client: httpx.AsyncClient, session: AsyncSession, plant: Plant, user: User):
     await add_care_log(session, plant.id, user.id, event_type="watering")
     await add_care_log(session, plant.id, user.id, event_type="fertilising")

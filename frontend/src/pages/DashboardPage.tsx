@@ -1,30 +1,61 @@
 import { Link } from 'react-router-dom';
-import { AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin } from 'lucide-react';
+import { AlarmClock, AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useCreateLogForPlant } from '../api/hooks/useLogs';
+import { useSnoozeReminder, useUnsnoozeReminder } from '../api/hooks/useReminders';
 import type { ReminderStatus } from '../api/types';
+import { CareEventChip } from '../components/CareEventChip';
 import { CardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { formatDate, formatDaysAgo } from '../lib/dates';
 
 function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red' | 'amber' }) {
   const createLog = useCreateLogForPlant();
+  const snoozeReminder = useSnoozeReminder();
+  const unsnoozeReminder = useUnsnoozeReminder();
   const { notify } = useToast();
+  const snoozed = Boolean(status.snoozed_until && new Date(status.snoozed_until).getTime() > Date.now());
 
   return (
     <Link
       to={`/plants/${status.plant_id}`}
       className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-stone-50"
     >
-      <div className="min-w-0">
+      <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <span className="font-medium">{status.plant_name}</span>
-        <span className="ml-2 text-sm text-stone-500">{status.event_type}</span>
+        <CareEventChip eventType={status.event_type} />
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <span className={`text-sm ${accent === 'red' ? 'text-red-600' : 'text-amber-600'}`}>
-          {status.due_at ? `due ${formatDate(status.due_at)}` : 'never logged'}
+        <span className={`text-sm ${snoozed ? 'text-stone-400' : accent === 'red' ? 'text-red-600' : 'text-amber-600'}`}>
+          {snoozed ? 'snoozed' : status.due_at ? `due ${formatDate(status.due_at)}` : 'never logged'}
         </span>
+        {!snoozed && (
+          <button
+            type="button"
+            title={`Snooze ${status.event_type} for ${status.interval_days} days`}
+            className="btn-secondary px-2 py-1"
+            disabled={snoozeReminder.isPending}
+            onClick={(event) => {
+              // Rendered inside the row's <Link>: don't navigate, just snooze.
+              event.preventDefault();
+              event.stopPropagation();
+              snoozeReminder.mutate(
+                { reminderId: status.reminder_id, plantId: status.plant_id },
+                {
+                  onSuccess: () =>
+                    notify(`${status.event_type} snoozed for ${status.interval_days} days`, 'success', {
+                      label: 'Undo',
+                      onClick: () =>
+                        unsnoozeReminder.mutate({ reminderId: status.reminder_id, plantId: status.plant_id }),
+                    }),
+                },
+              );
+            }}
+          >
+            <AlarmClock className="h-4 w-4" />
+          </button>
+        )}
         <button
           type="button"
           title={`Log ${status.event_type} for ${status.plant_name}`}

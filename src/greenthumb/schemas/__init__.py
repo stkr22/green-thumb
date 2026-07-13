@@ -19,7 +19,13 @@ from greenthumb.schemas.push import (
     PushSubscriptionRead,
     PushUnsubscribe,
 )
-from greenthumb.schemas.reminder import ReminderCreate, ReminderRead, ReminderStatusRead, ReminderUpdate
+from greenthumb.schemas.reminder import (
+    ReminderCreate,
+    ReminderRead,
+    ReminderSnooze,
+    ReminderStatusRead,
+    ReminderUpdate,
+)
 from greenthumb.schemas.species import SpeciesCreate, SpeciesListItem, SpeciesRead, SpeciesUpdate
 from greenthumb.schemas.user import ApiTokenRead, UserRead, UserUpdate
 
@@ -46,6 +52,7 @@ __all__ = [
     "RecentCare",
     "ReminderCreate",
     "ReminderRead",
+    "ReminderSnooze",
     "ReminderStatus",
     "ReminderStatusRead",
     "ReminderUpdate",
