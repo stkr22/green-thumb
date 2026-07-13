@@ -490,6 +490,30 @@ export interface paths {
         patch: operations["update_reminder_api_v1_reminders__reminder_id__patch"];
         trace?: never;
     };
+    "/api/v1/reminders/{reminder_id}/snooze": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Snooze Reminder
+         * @description Defer a reminder ("due but not needed"); defaults to one full interval from now.
+         */
+        post: operations["snooze_reminder_api_v1_reminders__reminder_id__snooze_post"];
+        /**
+         * Unsnooze Reminder
+         * @description Cancel an active snooze, restoring the regular schedule.
+         */
+        delete: operations["unsnooze_reminder_api_v1_reminders__reminder_id__snooze_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/dashboard": {
         parameters: {
             query?: never;
@@ -887,6 +911,8 @@ export interface components {
             last_watered_at?: string | null;
             /** Species Display Name */
             species_display_name?: string | null;
+            /** Due Events */
+            due_events?: string[];
         };
         /**
          * PlantRead
@@ -1061,6 +1087,8 @@ export interface components {
             enabled: boolean;
             /** Last Notified At */
             last_notified_at: string | null;
+            /** Snoozed Until */
+            snoozed_until: string | null;
             /**
              * Created By
              * Format: uuid
@@ -1071,6 +1099,14 @@ export interface components {
              * Format: date-time
              */
             created_at: string;
+        };
+        /**
+         * ReminderSnooze
+         * @description Payload to snooze a reminder; omitting days defers by the reminder's own interval.
+         */
+        ReminderSnooze: {
+            /** Days */
+            days?: number | null;
         };
         /**
          * ReminderStatus
@@ -1099,6 +1135,8 @@ export interface components {
             due_at: string | null;
             /** Overdue */
             overdue: boolean;
+            /** Snoozed Until */
+            snoozed_until?: string | null;
         };
         /**
          * ReminderStatusRead
@@ -1126,6 +1164,8 @@ export interface components {
             enabled: boolean;
             /** Last Notified At */
             last_notified_at: string | null;
+            /** Snoozed Until */
+            snoozed_until: string | null;
             /**
              * Created By
              * Format: uuid
@@ -2388,6 +2428,72 @@ export interface operations {
                 "application/json": components["schemas"]["ReminderUpdate"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    snooze_reminder_api_v1_reminders__reminder_id__snooze_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ReminderSnooze"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReminderRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    unsnooze_reminder_api_v1_reminders__reminder_id__snooze_delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                reminder_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
