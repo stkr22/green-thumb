@@ -42,7 +42,7 @@ test('logging watering updates the care summary and timeline', async ({ page }) 
 
   // Toast confirms the mutation, the summary flips to "today", and a Watering
   // row is inserted into the care log.
-  await expect(page.getByText('Water logged')).toBeVisible();
+  await expect(page.getByText('Watered', { exact: true })).toBeVisible();
   await expect(page.getByText('today')).toBeVisible();
   // A watering row is inserted into the care log (scope to the list item so we
   // don't match the event-type filter's <option>).

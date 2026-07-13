@@ -27,10 +27,15 @@ The landing page summarises what needs attention:
 - **Recently watered** — the latest waterings across all plants.
 - **Counts** — total plants and locations.
 
+Each row shows the event type as a colored chip (blue = watering, violet =
+fertilising, orange = repotting) so you can tell at a glance what's due, even
+on a phone.
+
 Click any plant in these lists to jump to its detail page — or act right
 here: every overdue/upcoming row has a **Done** button that logs the care
-event, and when several plants have overdue watering a **Water all** button
-logs them in one go.
+event, an **alarm-clock** button that snoozes the reminder (see
+[Reminders](#reminders)), and when several plants have overdue watering a
+**Water all** button logs them in one go.
 
 ## Locations
 
@@ -86,7 +91,9 @@ Click **+ Add plant** on the Plants page. Fields:
 
 The **Plants** page shows a card per plant with its cover photo (or a
 placeholder), name, species, location, tags, and a "watered X days ago"
-indicator. You can:
+indicator. When a care action is due, the card shows a colored chip (e.g.
+**Water due**), so you can spot what a plant needs even when browsing a
+single room or tag. You can:
 
 - **Search** by name or species (including the linked species' names).
 - **Filter by location**.
@@ -102,10 +109,11 @@ Open a plant to see everything about it and to take action:
 - **Delete** — removes the plant **and** its photos, care logs and reminders.
 - **Care guide** — the linked species' advice (light, watering, soil,
   deadheading, toxicity, common issues) plus **Apply default care plan**.
-- **Care summary** — days since last Watered / Fertilised / Repotted.
-- **Quick-log buttons** — **Water**, **Fertilise**, **Repot**, or **+ Custom**
-  for any other event type. Logging shows a confirmation and updates the summary
-  immediately.
+- **Care cards** — one tappable card per standard care type (**Water**,
+  **Fertilise**, **Repot**) showing when it was last done and, if a reminder
+  is configured, whether it's due or snoozed. Tap the card to log the event;
+  the confirmation toast offers **Undo** in case of an accidental tap. Use
+  **+ Custom** for any other event type.
 - **Photos** — upload one or several images at once, set any photo as the
   **cover** (star icon), or delete photos (asks for confirmation). Deleting
   the cover photo just clears the cover.
@@ -113,10 +121,10 @@ Open a plant to see everything about it and to take action:
   timeline of the plant's life.
 - **Care log** — a timeline of all events, filterable by type and paginated.
   Deleting an entry offers **Undo** in the confirmation toast.
-- **Reminders** — list, add, enable/disable, and delete reminders. Each
-  reminder shows when it next fires ("due in 3 days", "due today", overdue).
-  The event picker offers the standard types; choose **Custom…** for anything
-  else. Deleting offers **Undo**.
+- **Reminders** — list, add, enable/disable, snooze, and delete reminders.
+  Each reminder shows when it next fires ("due in 3 days", "due today",
+  overdue, or "snoozed until …"). The event picker offers the standard types;
+  choose **Custom…** for anything else. Deleting offers **Undo**.
 
 ## Logging care
 
@@ -141,6 +149,17 @@ overdue. Disable a reminder (uncheck "enabled") to keep it without it firing.
 
 Example: a watering reminder with an interval of 7 days notifies you once the
 plant hasn't been watered for more than a week.
+
+### Snoozing
+
+Sometimes a reminder is due but the action isn't actually needed — the soil
+is still wet, say. Instead of logging a watering that never happened, use the
+**alarm-clock** button (on a dashboard row or in the plant's reminders
+section) to **snooze** the reminder for one interval. A snoozed reminder
+leaves the overdue list, stops notifying, and reappears under "Next 7 days"
+labeled **snoozed** so it doesn't silently vanish. Logging the care event, or
+the snooze expiring, brings the reminder back to its normal schedule; the
+alarm-clock-off button cancels a snooze early.
 
 ## Calendar
 
@@ -203,4 +222,5 @@ If the test fails, notifications aren't configured on the server side — see
 - **Why can I see someone else's plants?** — this is a shared household instance
   by design; everyone signed in manages the same collection.
 - **A reminder won't stop notifying** — log the relevant care event (that resets
-  the interval) or disable/delete the reminder.
+  the interval), snooze it if the action isn't needed yet, or disable/delete
+  the reminder.
