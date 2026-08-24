@@ -28,6 +28,7 @@ or `.env.local`.
 | `VAPID_PRIVATE_KEY` | no | — | Base64url EC private key enabling Web Push (see [Web Push](#web-push-notifications)); Web Push is disabled if unset |
 | `VAPID_SUBJECT` | no | `mailto:admin@example.com` | Contact URI sent to browser push services; set it to a real address |
 | `REMINDER_CHECK_INTERVAL_SECONDS` | no | `3600` | How often the reminder loop runs (min 60) |
+| `HEMISPHERE` | no | `north` | `north` or `south`; which months count as which season for [seasonal care](user-guide.md#seasonal-care) |
 | `LOG_LEVEL` | no | `INFO` | Python log level |
 | `DEV_AUTH_BYPASS` | no | `false` | **Local only.** Enables `GET /auth/dev-login`; see [below](#dev-login-bypass-local-only) |
 | `DEV_AUTH_EMAIL` | no | `demo@example.com` | Demo user email when the bypass is on |

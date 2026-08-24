@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Pencil, Plus, Search, Sprout, Trash2 } from 'lucide-react';
 
+import { useApplySeasonPlan } from '../api/hooks/useSeasons';
 import { useCreateSpecies, useDeleteSpecies, useSpecies, useUpdateSpecies } from '../api/hooks/useSpecies';
 import type { SpeciesListItem } from '../api/types';
 import { Modal } from '../components/Modal';
@@ -64,6 +65,7 @@ export function SpeciesPage() {
   const { data: species = [], isLoading } = useSpecies(search || undefined);
   const createSpecies = useCreateSpecies();
   const updateSpecies = useUpdateSpecies();
+  const applySeasonPlan = useApplySeasonPlan();
   const { notify } = useToast();
   const [addOpen, setAddOpen] = useState(false);
   const [editing, setEditing] = useState<SpeciesListItem | null>(null);
@@ -130,7 +132,22 @@ export function SpeciesPage() {
                 { id: editing.id, ...payload },
                 {
                   onSuccess: () => {
-                    notify(`${payload.name} updated`);
+                    // Season plans are copied onto reminders when a plant is
+                    // created, so an edit only reaches existing plants if the
+                    // user asks for it. Offering it here is the moment it
+                    // makes sense; per-plant tuning is what the copy protects.
+                    notify(`${payload.name} updated`, 'success', {
+                      label: 'Apply pace to existing plants',
+                      onClick: () =>
+                        applySeasonPlan.mutate(editing.id, {
+                          onSuccess: (result) =>
+                            notify(
+                              `Seasonal pace applied to ${result.reminders_updated} ${
+                                result.reminders_updated === 1 ? 'reminder' : 'reminders'
+                              }`,
+                            ),
+                        }),
+                    });
                     setEditing(null);
                   },
                 },

@@ -1,14 +1,19 @@
 import { Link } from 'react-router-dom';
-import { AlarmClock, AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin } from 'lucide-react';
+import { AlarmClock, AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin, Sprout } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
 import { useCreateLogForPlant } from '../api/hooks/useLogs';
 import { useSnoozeReminder, useUnsnoozeReminder } from '../api/hooks/useReminders';
-import type { ReminderStatus } from '../api/types';
+import type { DashboardSummary, ReminderStatus } from '../api/types';
 import { CareEventChip } from '../components/CareEventChip';
 import { CardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { formatDate, formatDaysAgo } from '../lib/dates';
+
+// Snoozing defers by the current season's pace, so the label has to match.
+function snoozeDays(status: ReminderStatus): number {
+  return status.effective_interval_days ?? status.interval_days;
+}
 
 function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red' | 'amber' }) {
   const createLog = useCreateLogForPlant();
@@ -33,7 +38,7 @@ function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red'
         {!snoozed && (
           <button
             type="button"
-            title={`Snooze ${status.event_type} for ${status.interval_days} days`}
+            title={`Snooze ${status.event_type} for ${snoozeDays(status)} days`}
             className="btn-secondary px-2 py-1"
             disabled={snoozeReminder.isPending}
             onClick={(event) => {
@@ -44,7 +49,7 @@ function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red'
                 { reminderId: status.reminder_id, plantId: status.plant_id },
                 {
                   onSuccess: () =>
-                    notify(`${status.event_type} snoozed for ${status.interval_days} days`, 'success', {
+                    notify(`${status.event_type} snoozed for ${snoozeDays(status)} days`, 'success', {
                       label: 'Undo',
                       onClick: () =>
                         unsnoozeReminder.mutate({ reminderId: status.reminder_id, plantId: status.plant_id }),
@@ -104,6 +109,29 @@ function WaterAllButton({ overdue }: { overdue: ReminderStatus[] }) {
   );
 }
 
+// A schedule that changes on its own reads as a bug unless the app says so.
+// Hidden entirely until at least one reminder is actually on a seasonal pace.
+function SeasonBanner({ summary }: { summary: DashboardSummary }) {
+  if (summary.seasonal_adjusted === 0 && summary.seasonal_paused === 0) return null;
+  return (
+    <div className="card mb-6 flex flex-wrap items-center gap-x-2 gap-y-1 p-4 text-sm">
+      <Sprout className="h-5 w-5 text-emerald-600" />
+      <span className="font-medium capitalize">{summary.season}</span>
+      {summary.seasonal_adjusted > 0 && (
+        <span className="text-stone-500">
+          · {summary.seasonal_adjusted} {summary.seasonal_adjusted === 1 ? 'reminder is' : 'reminders are'} on the{' '}
+          {summary.season} pace
+        </span>
+      )}
+      {summary.seasonal_paused > 0 && (
+        <span className="text-stone-500">
+          · {summary.seasonal_paused} paused until the growing season
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function DashboardPage() {
   const { data, isLoading } = useDashboard();
 
@@ -125,6 +153,8 @@ export function DashboardPage() {
   return (
     <div className="mx-auto max-w-5xl">
       <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
+
+      <SeasonBanner summary={data} />
 
       <div className="mb-6 grid grid-cols-2 gap-4 sm:max-w-md">
         <div className="card flex items-center gap-3 p-4">

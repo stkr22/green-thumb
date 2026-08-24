@@ -114,6 +114,62 @@ reminder it finds the most recent matching care log and computes due state:
 The same due-state computation backs the `/dashboard` endpoint, so the dashboard
 and the notifications always agree on what's overdue.
 
+### Seasonal pacing
+
+`interval_days` is the **growing-season** pace. A reminder may carry
+`season_multipliers` (season → multiplier, `null` to suspend), and
+`services/seasons.py` turns that into a due date.
+
+Due dates come from **accumulating a daily rate** — day *d* contributes
+`1 / (interval_days × multiplier(season(d)))`, and the reminder is due on the
+day the running total reaches 1.0 — rather than from multiplying the interval by
+today's multiplier. Multiplying by the current season would move every due date
+the instant the season flips, turning a whole collection overdue on 1 March;
+accumulating prices days already spent at the winter pace at the winter pace.
+It also makes suspension fall out for free: a suspended day contributes 0, so a
+paused event type accrues nothing and comes due a full interval after the
+growing season resumes. With no plan, the accumulation reduces exactly to
+`last_logged_at + interval_days`, which is asserted directly in `tests/test_seasons.py`.
+
+A **paused** reminder (the current season's multiplier is `null`) never counts
+as overdue and never notifies; its `due_at` reports the resume date instead, so
+the UI can label it rather than show a stale overdue date. Re-notification
+back-off and the snooze default both use the season's effective interval, not
+the base one.
+
+`multiplier_for()` is the only seam that knows about discrete seasons — swapping
+in a smooth daylength curve from latitude would not touch the rest.
+
+Which months map to which season comes from the `HEMISPHERE` setting: it is
+deployment-wide rather than per-user, because plants are shared between users
+and a household sits in one hemisphere.
+
+### Annual-window reminders
+
+Season plans are **not** a fit for jobs that belong in a fixed window
+(repotting, pruning, overwintering): suspending three seasons of a two-year
+repotting interval would stretch it to roughly four years, since only active
+days accrue. Those use `schedule_kind = "annual_window"` with inclusive
+`window_start_month` / `window_end_month`, which may wrap the year.
+
+The two kinds mean different things and are mutually exclusive per reminder:
+
+| | interval | annual_window |
+|---|---|---|
+| Interval | scaled by `season_multipliers` | runs at full speed |
+| Dormant time | accrues nothing while suspended | accrues normally |
+| Effect | the schedule slows down | only the due date is deferred |
+
+A window reminder's due date is `last_logged_at + interval_days`, pushed forward
+by `seasons.next_window_start` to the next time the window opens (a snooze is
+applied before the deferral, so a snooze landing out of season is deferred too).
+Season multipliers are ignored for these — the window already says when the job
+may happen — and `paused` is always false.
+
+Months are stored literally rather than as seasons, so they mean the same thing
+in both hemispheres; the UI offers a season as a shortcut that fills the months
+using `seasons.months_for`.
+
 ## Photos
 
 Photos are stored as BLOBs in SQLite and served by `GET /api/v1/photos/{id}`
@@ -144,7 +200,23 @@ Six tables, all with UUID primary keys and UTC timestamps:
 - **care_logs** — `plant_id` → plants (`CASCADE`), `event_type`, `notes`,
   `logged_at` (user-supplied/backdatable), `logged_by`.
 - **reminders** — `plant_id` → plants (`CASCADE`), `event_type`,
-  `interval_days`, `enabled`, `last_notified_at`, `created_by`.
+  `interval_days`, `season_multipliers` (JSON: season → multiplier, `null`
+  suspends; empty means no seasonal change), `schedule_kind` (`interval` |
+  `annual_window`), `window_start_month` / `window_end_month`, `enabled`,
+  `last_notified_at`, `created_by`.
+
+`schedule_kind` is a plain string column rather than a SQL enum: SQLite cannot
+`ALTER TABLE ADD COLUMN` with the CHECK constraint `sa.Enum` emits, so the
+allowed values are enforced by `models.reminder.ScheduleKind` and the request
+schemas instead.
+
+`species.default_intervals`, `species.season_plan` (JSON: event type → season →
+multiplier) and `species.default_windows` (JSON: event type → `[start_month,
+end_month]`) are all **materialized** onto a plant's reminders at creation
+rather than read live, so tuning one plant never affects its siblings. The
+trade-off is that editing a species does not reach plants that already exist;
+`POST /species/{id}/apply-season-plan` is the explicit opt-in that rolls the
+pace and windows out to them, leaving per-plant intervals alone.
 
 `plants` and `plant_photos` reference each other (a plant's cover photo, and a
 photo's plant). Because SQLite cannot add a foreign key via `ALTER TABLE`, the

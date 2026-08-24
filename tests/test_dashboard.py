@@ -19,7 +19,11 @@ async def test_dashboard_empty(client: httpx.AsyncClient):
         "recently_watered": [],
         "total_plants": 0,
         "total_locations": 0,
+        "season": body["season"],
+        "seasonal_adjusted": 0,
+        "seasonal_paused": 0,
     }
+    assert body["season"] in {"spring", "summer", "autumn", "winter"}
 
 
 async def test_dashboard_overdue_and_upcoming(

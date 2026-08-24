@@ -9,10 +9,10 @@ from sqlmodel import select
 from greenthumb.api.v1.deps import get_plant_or_404
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Reminder
-from greenthumb.models.base import ensure_utc, utcnow
+from greenthumb.models.base import utcnow
 from greenthumb.schemas import ReminderCreate, ReminderRead, ReminderSnooze, ReminderStatusRead, ReminderUpdate
 from greenthumb.services import care
-from greenthumb.services.reminder_evaluator import effective_due_at
+from greenthumb.services.reminder_evaluator import compute_schedule
 
 router = APIRouter(tags=["reminders"])
 
@@ -25,10 +25,16 @@ async def list_reminders(plant_id: uuid.UUID, session: SessionDep, _user: Curren
     last_events = await care.last_event_per_type(session, plant_id)
     result = []
     for reminder in reminders:
-        last = last_events.get(reminder.event_type)
-        snoozed = ensure_utc(reminder.snoozed_until) if reminder.snoozed_until is not None else None
-        due_at = effective_due_at(last, reminder.interval_days, snoozed)
-        result.append(ReminderStatusRead(**reminder.model_dump(), due_at=due_at))
+        schedule = compute_schedule(reminder, last_events.get(reminder.event_type))
+        result.append(
+            ReminderStatusRead(
+                **reminder.model_dump(),
+                due_at=schedule.due_at,
+                season=schedule.season,
+                paused=schedule.paused,
+                effective_interval_days=schedule.effective_interval_days,
+            )
+        )
     return result
 
 
@@ -75,11 +81,16 @@ async def delete_reminder(reminder_id: uuid.UUID, session: SessionDep, _user: Cu
 async def snooze_reminder(
     reminder_id: uuid.UUID, payload: ReminderSnooze, session: SessionDep, _user: CurrentUser
 ) -> Reminder:
-    """Defer a reminder ("due but not needed"); defaults to one full interval from now."""
+    """Defer a reminder ("due but not needed"); defaults to one full interval from now.
+
+    The default follows the current season's pace, so snoozing a winter-slowed
+    reminder defers by the winter interval rather than the growing-season one.
+    """
     reminder = await session.get(Reminder, reminder_id)
     if reminder is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Reminder not found")
-    reminder.snoozed_until = utcnow() + timedelta(days=payload.days or reminder.interval_days)
+    pace = compute_schedule(reminder, None).effective_interval_days or reminder.interval_days
+    reminder.snoozed_until = utcnow() + timedelta(days=payload.days or pace)
     session.add(reminder)
     await session.commit()
     await session.refresh(reminder)

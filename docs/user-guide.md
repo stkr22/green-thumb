@@ -161,6 +161,93 @@ labeled **snoozed** so it doesn't silently vanish. Logging the care event, or
 the snooze expiring, brings the reminder back to its normal schedule; the
 alarm-clock-off button cancels a snooze early.
 
+## Seasonal care
+
+Most plants don't need the same care all year: they grow in the warm, bright
+months and idle in the cold, dark ones. A **season plan** lets one reminder run
+at a different pace in each season instead of forcing a year-round compromise.
+
+Season plans are set per **species** (Species → edit → *Seasonal pace*), because
+that's where care knowledge belongs, and are copied onto each plant's reminders
+when the plant is created.
+
+### Setting a pace
+
+The intervals under *Default care plan* are read as the **growing-season pace**.
+Under *Seasonal pace* you then say what each season should be instead — in days,
+not multipliers:
+
+| | Spring | Summer | Autumn | Winter |
+|---|---|---|---|---|
+| Watering | 7 | 6 | 9 | 14 |
+| Fertilising | 30 | 30 | paused | paused |
+
+The **Start from** buttons fill the grid with a sensible starting point
+(*tropical*, *standard*, *succulent*, *winter grower*) which you can then edit.
+*No seasonal change* clears the plan and puts the plant back on a flat interval.
+
+### Pausing
+
+Ticking **pause** for a season stops that event type entirely while the season
+lasts — the right behaviour for feeding, since fertilising a resting plant
+builds up salts that damage its roots. A paused reminder:
+
+- never shows as overdue and never notifies,
+- reads *"paused for winter · resumes 1 March"* on the plant page,
+- accrues nothing while paused, so it comes due a full interval **after** the
+  growing season starts, not the moment it does.
+
+### What you'll see
+
+- Reminder intervals are labelled with the season when they differ from the
+  base: *every 14 days · winter pace*.
+- The dashboard shows a banner naming the season and how many reminders are on
+  a seasonal pace or paused. It stays hidden until you set a plan.
+- Snoozing follows the seasonal pace too: snoozing a winter-slowed reminder
+  defers it by the winter interval.
+
+### Applying a plan to plants you already have
+
+Plans are copied when a plant is created, so editing a species leaves existing
+plants on their old pace — that copy is what keeps per-plant tuning safe. After
+saving a species, the confirmation offers **Apply pace to existing plants**,
+which pushes the plan onto every reminder of every plant of that species.
+Intervals you tuned per plant are left alone; only the seasonal pace changes.
+
+> **Upgrading:** existing reminders start with no season plan and behave exactly
+> as before. When you do add one, remember your current interval becomes the
+> *growing-season* pace — if you had settled on 10 days as a year-round
+> compromise, a *standard* plan makes that 20 days in winter. Adjust the base
+> down first if that's not what you want.
+
+Which months count as which season follows the server's `HEMISPHERE` setting
+(see [administration.md](administration.md)); southern-hemisphere installs get
+the seasons mirrored.
+
+### Care that belongs in one part of the year
+
+Pausing is the wrong tool for repotting, pruning or moving plants indoors: those
+aren't "slower in winter", they're *"only in spring"* (or only in autumn). A
+paused reminder accrues nothing, so pausing three seasons of a two-year
+repotting cycle would push it out to roughly four years.
+
+For those, set a **time of year** instead — a window of months. The interval
+keeps running at full speed and only the due date waits for the window to open:
+
+- Repotting every 730 days, window **Mar–May**: due two years after the last
+  repot, or on 1 March if that date lands outside the window.
+- Windows may wrap the year (**Nov–Feb**), which is what overwintering needs.
+- A plant added out of season won't demand repotting straight away; it waits for
+  the window.
+
+Set it per species under *Time of year* (repotting), or per plant in the
+reminders section using the **Only in … through …** selects, which work for any
+event type including custom ones.
+
+The two are mutually exclusive per event type: a window means "wait for the
+right months", a season pace means "go slower", and combining them would defer
+*and* stretch. If a species defines both for one event type, the window wins.
+
 ## Calendar
 
 The **Calendar** shows a month at a time. Days with upcoming care show a count

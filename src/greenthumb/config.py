@@ -10,6 +10,8 @@ from functools import lru_cache
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from greenthumb.services.seasons import Hemisphere
+
 
 class Settings(BaseSettings):
     """Runtime configuration for the Green Thumb backend."""
@@ -59,6 +61,12 @@ class Settings(BaseSettings):
     # How often the background loop evaluates reminders. Care intervals are in
     # days, so a daily check is plenty and keeps ntfy traffic low.
     REMINDER_CHECK_INTERVAL_SECONDS: int = Field(default=86400, ge=60)
+
+    # Season plans scale care intervals by time of year, so the installation
+    # needs to know which half of the globe it sits in. Deployment-wide rather
+    # than per-user: plants are shared between users, and a household has one
+    # hemisphere.
+    HEMISPHERE: Hemisphere = Hemisphere.NORTH
 
     LOG_LEVEL: str = "INFO"
 

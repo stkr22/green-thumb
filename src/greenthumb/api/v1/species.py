@@ -8,7 +8,8 @@ from sqlmodel import col, func, select, update
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Plant, Species
 from greenthumb.models.base import utcnow
-from greenthumb.schemas import SpeciesCreate, SpeciesListItem, SpeciesRead, SpeciesUpdate
+from greenthumb.schemas import SeasonPlanApplied, SpeciesCreate, SpeciesListItem, SpeciesRead, SpeciesUpdate
+from greenthumb.services.species import apply_season_plan_to_plants
 
 router = APIRouter(prefix="/species", tags=["species"])
 
@@ -68,6 +69,20 @@ async def update_species(
     await session.commit()
     await session.refresh(species)
     return species
+
+
+@router.post("/{species_id}/apply-season-plan", response_model=SeasonPlanApplied)
+async def apply_season_plan(species_id: uuid.UUID, session: SessionDep, _user: CurrentUser) -> SeasonPlanApplied:
+    """Roll this species' season plan out to the reminders of every plant already using it.
+
+    Plans are copied at plant creation, so this is how a collection that
+    predates the plan (or an edited plan) catches up. It overwrites only the
+    season multipliers; per-plant intervals are left alone.
+    """
+    species = await get_species_or_404(session, species_id)
+    updated = await apply_season_plan_to_plants(session, species)
+    await session.commit()
+    return SeasonPlanApplied(reminders_updated=updated)
 
 
 @router.delete("/{species_id}", status_code=status.HTTP_204_NO_CONTENT)

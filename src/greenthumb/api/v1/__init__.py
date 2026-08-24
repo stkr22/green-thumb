@@ -2,10 +2,21 @@
 
 from fastapi import APIRouter
 
-from greenthumb.api.v1 import dashboard, locations, logs, notifications, photos, plants, reminders, species
+from greenthumb.api.v1 import (
+    dashboard,
+    locations,
+    logs,
+    notifications,
+    photos,
+    plants,
+    reminders,
+    seasons,
+    species,
+)
 
 router = APIRouter(prefix="/api/v1")
 router.include_router(locations.router)
+router.include_router(seasons.router)
 router.include_router(species.router)
 router.include_router(plants.router)
 router.include_router(photos.router)
