@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.10.0](https://github.com/stkr22/green-thumb/compare/v0.9.0...v0.10.0) (2026-08-24)
+
+
+### Features
+
+* **care:** schedule care by season and by time of year ([63672a6](https://github.com/stkr22/green-thumb/commit/63672a60f6ef38988f0b0cef69eacbde5e62f8a1))
+* **care:** seasonal care — season plans and annual windows ([02c007f](https://github.com/stkr22/green-thumb/commit/02c007f665171e09f069a1d285835292061285d0))
+* **web:** edit seasonal pace and windows, and label what changed ([01545be](https://github.com/stkr22/green-thumb/commit/01545be50262d805501fd65a9b1149e93d7ab485))
+
+
+### Bug Fixes
+
+* **ci:** measure coverage of greenthumb instead of a nonexistent package ([f361d83](https://github.com/stkr22/green-thumb/commit/f361d8363196b36e0af96ecb3a877f28594dcb85))
+* **web:** stop serving the SPA shell for missing assets and API paths ([bb15c13](https://github.com/stkr22/green-thumb/commit/bb15c1395a20d665e8038e1639ef2c284b45afe6))
+
+
+### Documentation
+
+* **care:** explain seasonal care and capture the local run recipe ([726c4a2](https://github.com/stkr22/green-thumb/commit/726c4a2bfef767721ca78d77720b7eaba3c2bdbe))
+
 ## [0.9.0](https://github.com/stkr22/green-thumb/compare/v0.8.0...v0.9.0) (2026-07-13)
 
 
