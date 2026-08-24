@@ -77,6 +77,17 @@ cd frontend && npm run generate-types
 Hand-written hooks in `frontend/src/api/hooks/` wrap these types with TanStack
 Query.
 
+> `npm run generate-types` currently fails with `Cannot read properties of
+> undefined (reading 'createKeywordTypeNode')`: the frontend is on TypeScript 7,
+> while `openapi-typescript@7` needs the TypeScript 5 compiler API. Until the
+> generator supports TS 7, run it against a pinned TS 5 from a directory outside
+> the repo (so npm doesn't resolve the local install):
+>
+> ```bash
+> cd "$(mktemp -d)" && npx -y -p typescript@5.9.3 -p openapi-typescript@7.13.0 \
+>   openapi-typescript /path/to/openapi.json -o /path/to/frontend/src/api/types.gen.ts
+> ```
+
 ## Database migrations
 
 ```bash

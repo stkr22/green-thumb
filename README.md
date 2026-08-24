@@ -21,6 +21,9 @@ with SSO login through [Zitadel](https://zitadel.com).
 - **Locations** (rooms / areas) with plant counts
 - **Care logging** — watering, fertilising, repotting, or custom events (backdatable)
 - **Reminders** — get notified when a plant hasn't had a care event within N days
+- **Seasonal care** — per-species season plans slow watering and pause feeding
+  while plants are resting, then pick the pace back up in spring; jobs like
+  repotting can be pinned to a window of months instead
 - **Dashboard** — overdue and upcoming care at a glance, with one-tap quick-log
 - **Calendar** — monthly view of upcoming care
 - **Photos & growth journal** — gallery per plant with a selectable cover photo,
