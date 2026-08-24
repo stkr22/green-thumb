@@ -16,8 +16,13 @@ tasks see [development.md](development.md); for operating it see
 | Local dev | docker-compose (backend + frontend) | `docker-compose.yml` |
 
 The SPA and API share one origin in production: the FastAPI backend serves the
-built SPA at `/` alongside the API, so there is no CORS configuration. Traefik
-forwards the whole hostname to the backend.
+built SPA at `/` alongside the API (via `app.frontend()`), so there is no CORS
+configuration. Traefik forwards the whole hostname to the backend.
+
+Path operations win over the static files, and the `index.html` fallback only
+applies to requests that accept HTML. So a browser deep link like `/plants/123`
+resolves to the SPA shell, while a stale asset or an unknown `/api` path still
+returns a real `404` instead of an HTML page.
 
 ```
                       ┌──────────────── Traefik (one hostname) ───────────────┐

@@ -10,11 +10,8 @@ from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, status
-from fastapi.staticfiles import StaticFiles
+from fastapi import FastAPI
 from sqlmodel import text
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.types import Scope
 
 from greenthumb import auth
 from greenthumb.api import v1
@@ -23,20 +20,6 @@ from greenthumb.db import dispose_engine, get_engine, get_session_factory
 from greenthumb.services.reminder_evaluator import evaluate_and_notify
 
 logger = logging.getLogger(__name__)
-
-
-class _SPAStaticFiles(StaticFiles):
-    """Static files with an index.html fallback so client-side routes resolve."""
-
-    async def get_response(self, path: str, scope: Scope):
-        # StaticFiles raises (not returns) 404 for a missing path; a deep link
-        # like /plants/123 is a client-side route, so serve the SPA shell instead.
-        try:
-            return await super().get_response(path, scope)
-        except StarletteHTTPException as exc:
-            if exc.status_code == status.HTTP_404_NOT_FOUND:
-                return await super().get_response("index.html", scope)
-            raise
 
 
 async def _reminder_loop(interval_seconds: int) -> None:
@@ -85,8 +68,9 @@ async def readyz() -> dict[str, str]:
 
 
 # Serve the built SPA at / in the production image; the API routers and probes
-# registered above take precedence. ponytail: an unknown /api path falls through
-# to index.html rather than a JSON 404 — fine for a single-household app.
+# registered above take precedence. The index.html fallback only applies to
+# requests that accept HTML, so a deep link like /plants/123 resolves to the SPA
+# shell while a stale asset or an unknown /api path still gets a real 404.
 _static_dir = get_settings().STATIC_DIR
 if _static_dir and Path(_static_dir).is_dir():
-    app.mount("/", _SPAStaticFiles(directory=_static_dir, html=True), name="spa")
+    app.frontend("/", directory=_static_dir, fallback="index.html")
