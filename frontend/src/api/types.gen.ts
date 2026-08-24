@@ -183,6 +183,26 @@ export interface paths {
         patch: operations["update_location_api_v1_locations__location_id__patch"];
         trace?: never;
     };
+    "/api/v1/seasons": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get Season Info
+         * @description Return the installation's hemisphere, today's season and the season plan presets.
+         */
+        get: operations["get_season_info_api_v1_seasons_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/species": {
         parameters: {
             query?: never;
@@ -233,6 +253,30 @@ export interface paths {
          * @description Apply a partial update to a species.
          */
         patch: operations["update_species_api_v1_species__species_id__patch"];
+        trace?: never;
+    };
+    "/api/v1/species/{species_id}/apply-season-plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Apply Season Plan
+         * @description Roll this species' season plan out to the reminders of every plant already using it.
+         *
+         *     Plans are copied at plant creation, so this is how a collection that
+         *     predates the plan (or an edited plan) catches up. It overwrites only the
+         *     season multipliers; per-plant intervals are left alone.
+         */
+        post: operations["apply_season_plan_api_v1_species__species_id__apply_season_plan_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/plants": {
@@ -502,6 +546,9 @@ export interface paths {
         /**
          * Snooze Reminder
          * @description Defer a reminder ("due but not needed"); defaults to one full interval from now.
+         *
+         *     The default follows the current season's pace, so snoozing a winter-slowed
+         *     reminder defers by the winter interval rather than the growing-season one.
          */
         post: operations["snooze_reminder_api_v1_reminders__reminder_id__snooze_post"];
         /**
@@ -707,6 +754,12 @@ export interface components {
             total_plants: number;
             /** Total Locations */
             total_locations: number;
+            /** Season */
+            season: string;
+            /** Seasonal Adjusted */
+            seasonal_adjusted: number;
+            /** Seasonal Paused */
+            seasonal_paused: number;
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -1058,6 +1111,16 @@ export interface components {
             event_type: string;
             /** Interval Days */
             interval_days: number;
+            /** Season Multipliers */
+            season_multipliers?: {
+                [key: string]: number | null;
+            };
+            /** @default interval */
+            schedule_kind: components["schemas"]["ScheduleKind"];
+            /** Window Start Month */
+            window_start_month?: number | null;
+            /** Window End Month */
+            window_end_month?: number | null;
             /**
              * Enabled
              * @default true
@@ -1083,6 +1146,16 @@ export interface components {
             event_type: string;
             /** Interval Days */
             interval_days: number;
+            /** Season Multipliers */
+            season_multipliers: {
+                [key: string]: number | null;
+            };
+            /** Schedule Kind */
+            schedule_kind: string;
+            /** Window Start Month */
+            window_start_month: number | null;
+            /** Window End Month */
+            window_end_month: number | null;
             /** Enabled */
             enabled: boolean;
             /** Last Notified At */
@@ -1137,13 +1210,35 @@ export interface components {
             overdue: boolean;
             /** Snoozed Until */
             snoozed_until?: string | null;
+            /**
+             * Season
+             * @default spring
+             */
+            season: string;
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+            /** Effective Interval Days */
+            effective_interval_days?: number | null;
+            /**
+             * Schedule Kind
+             * @default interval
+             */
+            schedule_kind: string;
+            /** Window Start Month */
+            window_start_month?: number | null;
+            /** Window End Month */
+            window_end_month?: number | null;
         };
         /**
          * ReminderStatusRead
          * @description A reminder plus its computed schedule, for the plant detail page.
          *
          *     due_at is None when no matching care event exists yet — the reminder is
-         *     due immediately, matching the evaluator's overdue rule.
+         *     due immediately, matching the evaluator's overdue rule. While paused it
+         *     instead reports when the event type resumes.
          */
         ReminderStatusRead: {
             /**
@@ -1160,6 +1255,16 @@ export interface components {
             event_type: string;
             /** Interval Days */
             interval_days: number;
+            /** Season Multipliers */
+            season_multipliers: {
+                [key: string]: number | null;
+            };
+            /** Schedule Kind */
+            schedule_kind: string;
+            /** Window Start Month */
+            window_start_month: number | null;
+            /** Window End Month */
+            window_end_month: number | null;
             /** Enabled */
             enabled: boolean;
             /** Last Notified At */
@@ -1178,6 +1283,18 @@ export interface components {
             created_at: string;
             /** Due At */
             due_at?: string | null;
+            /**
+             * Season
+             * @default spring
+             */
+            season: string;
+            /**
+             * Paused
+             * @default false
+             */
+            paused: boolean;
+            /** Effective Interval Days */
+            effective_interval_days?: number | null;
         };
         /**
          * ReminderUpdate
@@ -1188,8 +1305,65 @@ export interface components {
             event_type?: string | null;
             /** Interval Days */
             interval_days?: number | null;
+            /** Season Multipliers */
+            season_multipliers?: {
+                [key: string]: number | null;
+            } | null;
+            schedule_kind?: components["schemas"]["ScheduleKind"] | null;
+            /** Window Start Month */
+            window_start_month?: number | null;
+            /** Window End Month */
+            window_end_month?: number | null;
             /** Enabled */
             enabled?: boolean | null;
+        };
+        /**
+         * ScheduleKind
+         * @description How a reminder's due date is derived.
+         * @enum {string}
+         */
+        ScheduleKind: "interval" | "annual_window";
+        /**
+         * SeasonInfo
+         * @description What the frontend needs to label and edit season plans.
+         *
+         *     Presets are served rather than duplicated in the frontend so the numbers
+         *     have one source of truth; they are copied into a plan as plain values, so
+         *     the key is never stored and this list can change between releases.
+         */
+        SeasonInfo: {
+            /** Hemisphere */
+            hemisphere: string;
+            /** Current Season */
+            current_season: string;
+            /** Presets */
+            presets: components["schemas"]["SeasonPreset"][];
+            /** Season Months */
+            season_months: {
+                [key: string]: number[];
+            };
+        };
+        /**
+         * SeasonPlanApplied
+         * @description How many existing reminders a season plan roll-out touched.
+         */
+        SeasonPlanApplied: {
+            /** Reminders Updated */
+            reminders_updated: number;
+        };
+        /**
+         * SeasonPreset
+         * @description A starting point for a species' season plan, offered by the species form.
+         */
+        SeasonPreset: {
+            /** Key */
+            key: string;
+            /** Plan */
+            plan: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
         };
         /**
          * SpeciesCreate
@@ -1220,6 +1394,16 @@ export interface components {
             /** Default Intervals */
             default_intervals?: {
                 [key: string]: number;
+            };
+            /** Season Plan */
+            season_plan?: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            /** Default Windows */
+            default_windows?: {
+                [key: string]: number[];
             };
         };
         /**
@@ -1253,6 +1437,16 @@ export interface components {
             /** Default Intervals */
             default_intervals: {
                 [key: string]: number;
+            };
+            /** Season Plan */
+            season_plan: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            /** Default Windows */
+            default_windows: {
+                [key: string]: number[];
             };
             /**
              * Created By
@@ -1307,6 +1501,16 @@ export interface components {
             default_intervals: {
                 [key: string]: number;
             };
+            /** Season Plan */
+            season_plan: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            };
+            /** Default Windows */
+            default_windows: {
+                [key: string]: number[];
+            };
             /**
              * Created By
              * Format: uuid
@@ -1349,6 +1553,16 @@ export interface components {
             /** Default Intervals */
             default_intervals?: {
                 [key: string]: number;
+            } | null;
+            /** Season Plan */
+            season_plan?: {
+                [key: string]: {
+                    [key: string]: number | null;
+                };
+            } | null;
+            /** Default Windows */
+            default_windows?: {
+                [key: string]: number[];
             } | null;
         };
         /**
@@ -1677,6 +1891,26 @@ export interface operations {
             };
         };
     };
+    get_season_info_api_v1_seasons_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonInfo"];
+                };
+            };
+        };
+    };
     list_species_api_v1_species_get: {
         parameters: {
             query?: {
@@ -1823,6 +2057,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SpeciesRead"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    apply_season_plan_api_v1_species__species_id__apply_season_plan_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                species_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeasonPlanApplied"];
                 };
             };
             /** @description Validation Error */

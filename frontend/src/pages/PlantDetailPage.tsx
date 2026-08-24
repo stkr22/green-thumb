@@ -47,6 +47,7 @@ import { CardSkeleton, Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { DEFAULT_CARE_EVENTS } from '../lib/careEvents';
 import { formatDate, formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
+import { MONTHS, paceLabel, windowLabel } from '../lib/seasons';
 
 const DUE_SOON_MS = 2 * 24 * 60 * 60 * 1000;
 
@@ -368,16 +369,59 @@ function CareLogTimeline({ plantId }: { plantId: string }) {
 // "custom" still allows arbitrary event types.
 const CUSTOM_EVENT = '__custom__';
 
+/** Snoozing defers by the current season's pace, so the label has to match. */
+function snoozeDays(reminder: ReminderStatusRead): number {
+  return reminder.effective_interval_days ?? reminder.interval_days;
+}
+
+/** How often this reminder currently fires, labelled with the season when it differs. */
+function ReminderPace({ reminder }: { reminder: ReminderStatusRead }) {
+  if (reminder.window_start_month && reminder.window_end_month) {
+    return (
+      <span className="text-sm text-stone-500">
+        every {reminder.interval_days} days
+        <span className="text-stone-400">
+          {' '}
+          · in {windowLabel(reminder.window_start_month, reminder.window_end_month)}
+        </span>
+      </span>
+    );
+  }
+  if (reminder.paused) {
+    return <span className="text-sm text-stone-500">every {reminder.interval_days} days in season</span>;
+  }
+  const days = reminder.effective_interval_days ?? reminder.interval_days;
+  return (
+    <span className="text-sm text-stone-500">
+      every {days} days
+      {days !== reminder.interval_days && <span className="text-stone-400"> · {paceLabel(reminder.season)}</span>}
+    </span>
+  );
+}
+
 function ReminderDueLabel({
   dueAt,
   enabled,
   snoozedUntil,
+  paused,
+  season,
 }: {
   dueAt: string | null;
   enabled: boolean;
   snoozedUntil: string | null;
+  paused: boolean;
+  season: string;
 }) {
-  if (!enabled) return <span className="text-sm text-stone-400">paused</span>;
+  // "off" rather than "paused": seasonal pausing is a separate, automatic state.
+  if (!enabled) return <span className="text-sm text-stone-400">off</span>;
+  if (paused) {
+    return (
+      <span className="text-sm text-stone-400">
+        paused for {season}
+        {dueAt && ` · resumes ${formatDate(dueAt)}`}
+      </span>
+    );
+  }
   if (snoozedUntil && new Date(snoozedUntil).getTime() > Date.now()) {
     return <span className="text-sm text-stone-400">snoozed until {formatDate(snoozedUntil)}</span>;
   }
@@ -397,6 +441,9 @@ function RemindersSection({ plantId }: { plantId: string }) {
   const [eventChoice, setEventChoice] = useState('watering');
   const [customEvent, setCustomEvent] = useState('');
   const [intervalDays, setIntervalDays] = useState(7);
+  // Empty means a plain interval; a month pair makes it an annual-window
+  // reminder, whose due date waits for those months.
+  const [window, setWindow] = useState<[number, number] | null>(null);
 
   return (
     <section className="card p-5">
@@ -409,11 +456,13 @@ function RemindersSection({ plantId }: { plantId: string }) {
             <li key={reminder.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
               <div className="flex flex-wrap items-center gap-2">
                 <CareEventChip eventType={reminder.event_type} />
-                <span className="text-sm text-stone-500">every {reminder.interval_days} days</span>
+                <ReminderPace reminder={reminder} />
                 <ReminderDueLabel
                   dueAt={reminder.due_at ?? null}
                   enabled={reminder.enabled}
                   snoozedUntil={reminder.snoozed_until ?? null}
+                  paused={reminder.paused}
+                  season={reminder.season}
                 />
               </div>
               <div className="flex items-center gap-2">
@@ -440,7 +489,7 @@ function RemindersSection({ plantId }: { plantId: string }) {
                 ) : (
                   <button
                     type="button"
-                    title={`Snooze for ${reminder.interval_days} days`}
+                    title={`Snooze for ${snoozeDays(reminder)} days`}
                     className="text-stone-400 hover:text-emerald-600"
                     disabled={snoozeReminder.isPending}
                     onClick={() =>
@@ -448,7 +497,7 @@ function RemindersSection({ plantId }: { plantId: string }) {
                         { reminderId: reminder.id, plantId },
                         {
                           onSuccess: () =>
-                            notify(`${reminder.event_type} snoozed for ${reminder.interval_days} days`, 'success', {
+                            notify(`${reminder.event_type} snoozed for ${snoozeDays(reminder)} days`, 'success', {
                               label: 'Undo',
                               onClick: () => unsnoozeReminder.mutate({ reminderId: reminder.id, plantId }),
                             }),
@@ -473,6 +522,12 @@ function RemindersSection({ plantId }: { plantId: string }) {
                               event_type: reminder.event_type,
                               interval_days: reminder.interval_days,
                               enabled: reminder.enabled,
+                              // Undo has to restore the schedule too, or the
+                              // reminder comes back on a different cadence.
+                              season_multipliers: reminder.season_multipliers,
+                              schedule_kind: reminder.schedule_kind === 'annual_window' ? 'annual_window' : 'interval',
+                              window_start_month: reminder.window_start_month,
+                              window_end_month: reminder.window_end_month,
                             }),
                         }),
                     })
@@ -492,14 +547,26 @@ function RemindersSection({ plantId }: { plantId: string }) {
           const eventType = eventChoice === CUSTOM_EVENT ? customEvent.trim() : eventChoice;
           if (!eventType) return;
           createReminder.mutate(
-            { event_type: eventType, interval_days: intervalDays, enabled: true },
+            {
+              event_type: eventType,
+              interval_days: intervalDays,
+              enabled: true,
+              schedule_kind: window ? ('annual_window' as const) : ('interval' as const),
+              window_start_month: window?.[0],
+              window_end_month: window?.[1],
+            },
             { onSuccess: () => setCustomEvent('') },
           );
         }}
       >
         <div>
           <label className="mb-1 block text-xs text-stone-500">Event</label>
-          <select className="input-base w-36" value={eventChoice} onChange={(e) => setEventChoice(e.target.value)}>
+          <select
+            className="input-base w-36"
+            aria-label="Event"
+            value={eventChoice}
+            onChange={(e) => setEventChoice(e.target.value)}
+          >
             {DEFAULT_CARE_EVENTS.map(({ eventType, label }) => (
               <option key={eventType} value={eventType}>
                 {label}
@@ -513,6 +580,7 @@ function RemindersSection({ plantId }: { plantId: string }) {
             <label className="mb-1 block text-xs text-stone-500">Custom event</label>
             <input
               className="input-base w-36"
+              aria-label="Custom event"
               placeholder="misting"
               value={customEvent}
               onChange={(e) => setCustomEvent(e.target.value)}
@@ -525,10 +593,47 @@ function RemindersSection({ plantId }: { plantId: string }) {
             type="number"
             min={1}
             className="input-base w-28"
+            aria-label="Every (days)"
             value={intervalDays}
             onChange={(e) => setIntervalDays(Number(e.target.value))}
           />
         </div>
+        <div>
+          <label className="mb-1 block text-xs text-stone-500">Only in</label>
+          <select
+            className="input-base w-32"
+            aria-label="Window start month"
+            value={window ? window[0] : ''}
+            onChange={(e) => {
+              const month = Number.parseInt(e.target.value, 10);
+              setWindow(month > 0 ? [month, window?.[1] ?? month] : null);
+            }}
+          >
+            <option value="">Any month</option>
+            {MONTHS.map((label, index) => (
+              <option key={label} value={index + 1}>
+                {label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {window && (
+          <div>
+            <label className="mb-1 block text-xs text-stone-500">through</label>
+            <select
+              className="input-base w-32"
+              aria-label="Window end month"
+              value={window[1]}
+              onChange={(e) => setWindow([window[0], Number.parseInt(e.target.value, 10)])}
+            >
+              {MONTHS.map((label, index) => (
+                <option key={label} value={index + 1}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <button type="submit" className="btn-primary" disabled={createReminder.isPending}>
           <Plus className="h-4 w-4" />
           Add
