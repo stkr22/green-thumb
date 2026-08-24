@@ -1,5 +1,5 @@
 [build-system]
-requires = ["uv_build~=0.11.21"]
+requires = ["uv_build~=0.12.5"]
 build-backend = "uv_build"
 
 [project]
@@ -28,17 +28,17 @@ classifiers = [
 
 dependencies = [
     "aiosqlite~=0.22.1",
-    "alembic~=1.18.4",
-    "fastapi~=0.137.1",
+    "alembic~=1.19.1",
+    "fastapi~=0.141.1",
     "httpx~=0.28.1",
-    "joserfc~=1.7.1",
-    "pillow~=12.2.0",
-    "pydantic-settings~=2.14.1",
+    "joserfc~=1.7.4",
+    "pillow~=12.3.0",
+    "pydantic-settings~=2.15.0",
     "python-multipart~=0.0.32",
-    "pywebpush>=2.3.0",
-    "sqlalchemy[asyncio]~=2.0.51",
-    "sqlmodel~=0.0.38",
-    "uvicorn[standard]~=0.49.0",
+    "pywebpush>=2.4.0",
+    "sqlalchemy[asyncio]~=2.0.52",
+    "sqlmodel~=0.0.39",
+    "uvicorn[standard]~=0.52.4",
 ]
 
 [project.urls]
@@ -50,16 +50,16 @@ Changelog = "https://github.com/stkr22/green-thumb/blob/main/CHANGELOG.md"
 
 [dependency-groups]
 dev = [
-    "ruff~=0.15.17",
-    "ty~=0.0.49",
-    "pytest~=9.1.0",
+    "ruff~=0.16.4",
+    "ty~=0.0.74",
+    "pytest~=9.1.1",
     "pytest-cov~=7.1.0",
     "pytest-asyncio~=1.4.0",
     "pytest-timeout~=2.4.0",
 ]
 
 [tool.uv]
-required-version = "~=0.11.8"
+required-version = "~=0.12.5"
 
 [tool.ty.rules]
 possibly-unresolved-reference = "warn"
