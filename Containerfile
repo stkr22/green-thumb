@@ -13,16 +13,17 @@ COPY frontend/ ./
 ENV VITE_API_BASE_URL=""
 RUN npm run build
 
-# Build stage: Python 3.14.4-trixie
-FROM docker.io/library/python:3.14.4-trixie@sha256:8f84f00e6981bff45ce0ed100019142e13a397412bc130425f34ece42906cd48 AS build-python
+# Build stage: Python 3.14.7-trixie
+FROM docker.io/library/python:3.14.7-trixie@sha256:20f4b272cb5d0f462c84645f8127d82e6fcfdc4006f4dd7f8859a5be4d5ef7a5 AS build-python
 
 ENV UV_LINK_MODE=copy \
     UV_COMPILE_BYTECODE=1 \
     UV_PYTHON_DOWNLOADS=never \
     PYTHONUNBUFFERED=1
 
-# Install uv.
-COPY --from=ghcr.io/astral-sh/uv:0.11.8@sha256:3b7b60a81d3c57ef471703e5c83fd4aaa33abcd403596fb22ab07db85ae91347 /uv /uvx /bin/
+# Install uv. Must satisfy `required-version` in pyproject.toml ([tool.uv]),
+# otherwise `uv sync` below refuses to run.
+COPY --from=ghcr.io/astral-sh/uv:0.12.5@sha256:e85be844203885286c60ffad8a858d48afb6c5a5c237ca0e67f12e74b8f174b1 /uv /uvx /bin/
 
 WORKDIR /app
 
@@ -39,8 +40,8 @@ COPY README.md LICENSE ./
 RUN --mount=type=cache,target=/root/.cache \
     uv sync --locked --no-dev
 
-# Runtime stage: Python 3.14.4-slim-trixie
-FROM docker.io/library/python:3.14.4-slim-trixie@sha256:538a18f1db92b4210a0b71aca2d14c156a96dedbe8867465c8ff4dce04d2ec39
+# Runtime stage: Python 3.14.7-slim-trixie
+FROM docker.io/library/python:3.14.7-slim-trixie@sha256:ce40764625a4ff50df3548277632e7f96c4e77fe75fa848aae9885476e7df5a4
 
 ENV PYTHONUNBUFFERED=1
 

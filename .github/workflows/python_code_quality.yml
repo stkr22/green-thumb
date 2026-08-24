@@ -54,9 +54,6 @@ jobs:
 
   tests:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.12", "3.13"]
     steps:
       - name: Checkout code
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
@@ -75,5 +72,6 @@ jobs:
         run: uv sync --all-extras --dev
 
       - name: Run Pytest
-        run: |
-          uv run pytest tests -m "not integration" --doctest-modules --junitxml=junit/test-results.xml --cov=com --cov-report=xml --cov-report=html
+        # testpaths (tests/) and the default flags come from
+        # [tool.pytest.ini_options] in pyproject.toml.
+        run: uv run pytest --cov=greenthumb --cov-report=xml --cov-report=term
