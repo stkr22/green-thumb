@@ -26,7 +26,14 @@ from greenthumb.schemas.reminder import (
     ReminderStatusRead,
     ReminderUpdate,
 )
-from greenthumb.schemas.species import SpeciesCreate, SpeciesListItem, SpeciesRead, SpeciesUpdate
+from greenthumb.schemas.season import SeasonInfo, SeasonPreset
+from greenthumb.schemas.species import (
+    SeasonPlanApplied,
+    SpeciesCreate,
+    SpeciesListItem,
+    SpeciesRead,
+    SpeciesUpdate,
+)
 from greenthumb.schemas.user import ApiTokenRead, UserRead, UserUpdate
 
 __all__ = [
@@ -56,6 +63,9 @@ __all__ = [
     "ReminderStatus",
     "ReminderStatusRead",
     "ReminderUpdate",
+    "SeasonInfo",
+    "SeasonPlanApplied",
+    "SeasonPreset",
     "SpeciesCreate",
     "SpeciesListItem",
     "SpeciesRead",
