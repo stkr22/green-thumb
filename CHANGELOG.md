@@ -1,5 +1,22 @@
 # Changelog
 
+## [1.0.0](https://github.com/stkr22/green-thumb/compare/v0.10.0...v1.0.0) (2026-11-12)
+
+
+### ⚠ BREAKING CHANGES
+
+* **api:** SESSION_SECRET_KEY needs 32+ chars; cookie writes need an X-Requested-With header; DEV_AUTH_BYPASS won't start with OIDC or Secure cookies.
+
+### Features
+
+* **api:** harden auth, uploads and push delivery ([8a7e2a6](https://github.com/stkr22/green-thumb/commit/8a7e2a6d97bfbebf989934331f68c787ad8afb9b))
+* **web:** load pages complete, update instantly, work on phones ([d9836c8](https://github.com/stkr22/green-thumb/commit/d9836c8e3476c8444383705c2dcc83a9f69a446b))
+
+
+### Documentation
+
+* replace the never-existing compose setup with the real local flow ([b7f1f4a](https://github.com/stkr22/green-thumb/commit/b7f1f4a2084b987f2bd3d396a88d6bb4bcf96d37))
+
 ## [0.10.0](https://github.com/stkr22/green-thumb/compare/v0.9.0...v0.10.0) (2026-08-24)
 
 
