@@ -4,10 +4,13 @@ import io
 import uuid
 
 import httpx
+import pytest
 from PIL import Image
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from greenthumb.api.v1 import photos
 from greenthumb.models import Plant
+from greenthumb.services.images import DISPLAY_MAX_EDGE, THUMBNAIL_MAX_EDGE, UnprocessableImageError, process_upload
 
 
 def _png_bytes(size: tuple[int, int] = (1200, 900)) -> bytes:
@@ -76,3 +79,30 @@ async def test_delete_photo_clears_cover(client: httpx.AsyncClient, session: Asy
     await session.refresh(plant)
     assert plant.cover_photo_id is None
     assert (await client.get(f"/api/v1/photos/{photo_id}")).status_code == 404
+
+
+async def test_upload_over_size_limit_is_413(client: httpx.AsyncClient, plant: Plant, monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(photos, "MAX_PHOTO_BYTES", 1024)
+    response = await _upload(client, plant.id, content=b"\0" * 2048)
+    assert response.status_code == 413
+
+
+def test_process_upload_rejects_pixel_bombs():
+    # 72 MP but a tiny file: the header alone must be enough to refuse it.
+    buffer = io.BytesIO()
+    Image.new("1", (9000, 8000)).save(buffer, format="PNG")
+    with pytest.raises(UnprocessableImageError):
+        process_upload(buffer.getvalue())
+
+
+def test_process_upload_rejects_unexpected_formats():
+    buffer = io.BytesIO()
+    Image.new("RGB", (10, 10)).save(buffer, format="TIFF")
+    with pytest.raises(UnprocessableImageError):
+        process_upload(buffer.getvalue())
+
+
+def test_process_upload_bounds_both_variants():
+    display, thumbnail = process_upload(_png_bytes((4000, 3000)))
+    assert max(Image.open(io.BytesIO(display)).size) == DISPLAY_MAX_EDGE
+    assert max(Image.open(io.BytesIO(thumbnail)).size) == THUMBNAIL_MAX_EDGE

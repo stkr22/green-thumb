@@ -1,7 +1,7 @@
 """Shared test fixtures.
 
 Tests run against in-memory SQLite (with the foreign_keys pragma enabled so
-ON DELETE behaviour matches PostgreSQL) and authenticate by minting a real
+ON DELETE behaviour matches production) and authenticate by minting a real
 session cookie, so the whole auth dependency chain is exercised.
 """
 
@@ -10,7 +10,7 @@ import uuid
 from collections.abc import AsyncGenerator
 
 # Configuration must exist before greenthumb modules read it.
-os.environ.setdefault("SESSION_SECRET_KEY", "test-secret-key-for-sessions")
+os.environ.setdefault("SESSION_SECRET_KEY", "test-secret-key-for-sessions-0123456789")
 os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
 os.environ.setdefault("DATABASE_URL", "sqlite+aiosqlite://")
 os.environ.setdefault("OIDC_ISSUER_URL", "https://auth.test")
@@ -25,6 +25,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
 
+from greenthumb.auth.dependencies import CSRF_HEADER
 from greenthumb.auth.session import SESSION_COOKIE_NAME, create_session_token
 from greenthumb.db import get_db
 from greenthumb.main import app
@@ -76,7 +77,9 @@ async def client(session: AsyncSession, user: User) -> AsyncGenerator[httpx.Asyn
 
     app.dependency_overrides[get_db] = _override_get_db
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as api_client:
+    # The SPA sends the CSRF header on every request; so does this client.
+    headers = {CSRF_HEADER: "greenthumb"}
+    async with httpx.AsyncClient(transport=transport, base_url="http://test", headers=headers) as api_client:
         api_client.cookies.set(SESSION_COOKIE_NAME, create_session_token(user.id))
         yield api_client
     app.dependency_overrides.clear()

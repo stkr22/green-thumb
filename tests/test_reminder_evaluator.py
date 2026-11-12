@@ -62,6 +62,19 @@ async def test_overdue_reminder_notifies_subscribed_users(
     assert reminder.last_notified_at is not None
 
 
+async def test_shared_ntfy_topic_receives_one_digest(
+    session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
+):
+    # user (fixture) and a housemate both fall back to the shared NTFY_TOPIC.
+    session.add(User(oidc_sub="oidc|housemate", email="housemate@example.com", display_name="Housemate"))
+    session.add(User(oidc_sub="oidc|own", email="own@example.com", display_name="Own", ntfy_topic_override="mine"))
+    await _make_overdue_reminder(session, plant, user)
+
+    assert await reminder_evaluator.evaluate_and_notify(session) == 2
+    default_topic = reminder_evaluator.get_settings().NTFY_TOPIC
+    assert sorted(p["topic"] for p in sent_notifications) == sorted([default_topic, "mine"])
+
+
 async def test_renotification_is_throttled(
     session: AsyncSession, plant: Plant, user: User, sent_notifications: list[dict]
 ):

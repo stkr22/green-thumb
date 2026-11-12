@@ -2,9 +2,12 @@
 
 import asyncio
 from logging.config import fileConfig
+from typing import Literal
 
+from alembic.autogenerate.api import AutogenContext
 from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
+from sqlalchemy.types import TypeDecorator
 from sqlmodel import SQLModel
 
 import greenthumb.models  # noqa: F401 - imported for metadata side effects
@@ -16,6 +19,17 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 target_metadata = SQLModel.metadata
+
+
+def _render_item(type_: str, obj: object, autogen_context: AutogenContext) -> str | Literal[False]:  # noqa: ARG001
+    """Render app-level TypeDecorators (e.g. UTCDateTime) as their plain SQL type.
+
+    Migrations must keep working after the app code they were generated from
+    changes, so they should not import column types from greenthumb.
+    """
+    if type_ == "type" and isinstance(obj, TypeDecorator):
+        return f"sa.{obj.impl!r}"
+    return False
 
 
 def run_migrations_offline() -> None:
@@ -38,6 +52,7 @@ def _run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         render_as_batch=connection.dialect.name == "sqlite",
+        render_item=_render_item,
     )
     with context.begin_transaction():
         context.run_migrations()

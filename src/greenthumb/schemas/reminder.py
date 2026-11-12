@@ -53,25 +53,28 @@ class ReminderCreate(SQLModel):
 class ReminderUpdate(SQLModel):
     """Partial update for a reminder."""
 
-    event_type: str | None = Field(default=None, min_length=1, max_length=100)
-    interval_days: int | None = Field(default=None, gt=0, le=3650)
-    season_multipliers: SeasonMultipliersField | None = None
-    schedule_kind: ScheduleKind | None = None
+    # NOT NULL columns are typed non-optional with a None default: omitting the
+    # field leaves it unchanged, while an explicit null is a 422 instead of an
+    # IntegrityError. Nullable columns keep `| None` so null clears them.
+    event_type: str = Field(default=None, min_length=1, max_length=100)
+    interval_days: int = Field(default=None, gt=0, le=3650)
+    season_multipliers: SeasonMultipliersField = Field(default=None)
+    schedule_kind: ScheduleKind = Field(default=None)
     window_start_month: int | None = Field(default=None, ge=1, le=12)
     window_end_month: int | None = Field(default=None, ge=1, le=12)
-    enabled: bool | None = None
+    enabled: bool = Field(default=None)
 
     @field_validator("season_multipliers")
     @classmethod
-    def _validate_multipliers(cls, value: SeasonMultipliersField | None) -> SeasonMultipliersField | None:
-        return value if value is None else _check_multipliers(value)
+    def _validate_multipliers(cls, value: SeasonMultipliersField) -> SeasonMultipliersField:
+        return _check_multipliers(value)
 
     @model_validator(mode="after")
     def _validate_window(self) -> ReminderUpdate:
         # Only checkable when the kind is part of the same patch; switching kind
         # without months (or the reverse) is rejected here rather than silently
         # producing a window reminder with no window.
-        if self.schedule_kind is not None:
+        if "schedule_kind" in self.model_fields_set:
             _check_window(self.schedule_kind, self.window_start_month, self.window_end_month)
         return self
 

@@ -28,7 +28,7 @@ async def send_notification(*, title: str, message: str, topic: str | None = Non
     }
     headers = {}
     if settings.NTFY_TOKEN:
-        headers["Authorization"] = f"Bearer {settings.NTFY_TOKEN}"
+        headers["Authorization"] = f"Bearer {settings.NTFY_TOKEN.get_secret_value()}"
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(settings.NTFY_URL, json=payload, headers=headers, timeout=10.0)

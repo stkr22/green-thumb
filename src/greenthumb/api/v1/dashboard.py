@@ -8,7 +8,7 @@ from sqlmodel import col, func, select
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.config import get_settings
 from greenthumb.models import CareLog, Location, Plant
-from greenthumb.models.base import ensure_utc, utcnow
+from greenthumb.models.base import utcnow
 from greenthumb.schemas import DashboardSummary, RecentCare
 from greenthumb.services import care, seasons
 from greenthumb.services.reminder_evaluator import compute_reminder_statuses, split_due
@@ -31,7 +31,7 @@ async def _recently_watered(session: SessionDep) -> list[RecentCare]:
     )
     rows = (await session.exec(statement)).all()
     return [
-        RecentCare(plant_id=plant_id, plant_name=name, event_type=care.WATERING, logged_at=ensure_utc(logged_at))
+        RecentCare(plant_id=plant_id, plant_name=name, event_type=care.WATERING, logged_at=logged_at)
         for plant_id, name, logged_at in rows
     ]
 

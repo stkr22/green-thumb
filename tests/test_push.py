@@ -1,16 +1,24 @@
 """Web Push subscription API, VAPID key derivation, and evaluator delivery tests."""
 
 import base64
+import os
+import uuid
+from collections.abc import AsyncIterator, Iterator
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 
 import httpx
 import pytest
+from aiohttp import web
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import ec
 from py_vapid import Vapid
+from pydantic import SecretStr, ValidationError
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from greenthumb.api.v1 import notifications
+from greenthumb.config import Settings
 from greenthumb.models import Plant, PushSubscription, Reminder, User
 from greenthumb.services import reminder_evaluator, webpush
 from tests.conftest import add_care_log
@@ -52,21 +60,83 @@ async def test_public_key_null_when_unconfigured(client: httpx.AsyncClient):
     assert response.json()["key"] is None
 
 
-def test_public_key_derivation(monkeypatch: pytest.MonkeyPatch):
+def _b64url(raw: bytes) -> str:
+    return base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+
+
+@pytest.fixture
+def vapid_configured(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     vapid = Vapid()
     vapid.generate_keys()
-    raw = vapid.private_key.private_numbers().private_value.to_bytes(32, "big")
-    private_key = base64.urlsafe_b64encode(raw).rstrip(b"=").decode()
+    private_key = _b64url(vapid.private_key.private_numbers().private_value.to_bytes(32, "big"))
     monkeypatch.setattr(
-        webpush, "get_settings", lambda: SimpleNamespace(VAPID_PRIVATE_KEY=private_key, VAPID_SUBJECT="mailto:a@b")
+        webpush,
+        "get_settings",
+        lambda: SimpleNamespace(VAPID_PRIVATE_KEY=SecretStr(private_key), VAPID_SUBJECT="mailto:admin@example.com"),
     )
-    webpush.public_key.cache_clear()
+    webpush._vapid.cache_clear()
+    yield
+    webpush._vapid.cache_clear()
+
+
+def test_public_key_derivation(vapid_configured: None):
     key = webpush.public_key()
-    webpush.public_key.cache_clear()
     # An uncompressed P-256 point is 65 bytes starting 0x04 -> base64url 'B...'.
     assert key is not None
     assert key.startswith("B")
     assert len(key) == 87
+
+
+def _browser_subscription(endpoint: str) -> PushSubscription:
+    """A subscription with real browser-style keys, so payload encryption runs."""
+    client_key = ec.generate_private_key(ec.SECP256R1()).public_key()
+    p256dh = client_key.public_bytes(serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+    return PushSubscription(
+        user_id=uuid.uuid4(), endpoint=endpoint, p256dh=_b64url(p256dh), auth=_b64url(os.urandom(16))
+    )
+
+
+async def test_send_notification_maps_push_service_responses(
+    vapid_configured: None, aiohttp_push_service: tuple[str, list[web.Request]]
+):
+    base_url, requests = aiohttp_push_service
+
+    async def send(path: str) -> webpush.PushResult:
+        return await webpush.send_notification(_browser_subscription(base_url + path), title="t", message="m")
+
+    assert await send("/ok") is webpush.PushResult.SENT
+    assert await send("/gone") is webpush.PushResult.GONE
+    assert await send("/error") is webpush.PushResult.FAILED
+    # A non-zero TTL lets the push service hold the digest for a sleeping phone.
+    assert int(requests[0].headers["TTL"]) > 0
+    assert requests[0].headers["Authorization"].startswith("vapid ")
+
+
+async def test_send_notification_survives_unreachable_endpoint(vapid_configured: None):
+    # Port 9 (discard) is closed locally: a connection error, not a WebPushException.
+    subscription = _browser_subscription("http://127.0.0.1:9/push")
+    assert await webpush.send_notification(subscription, title="t", message="m") is webpush.PushResult.FAILED
+
+
+@pytest.fixture
+async def aiohttp_push_service() -> AsyncIterator[tuple[str, list[web.Request]]]:
+    """A local stand-in for a browser push service."""
+    requests: list[web.Request] = []
+    statuses = {"/ok": 201, "/gone": 410, "/error": 500}
+
+    async def handle(request: web.Request) -> web.Response:
+        requests.append(request)
+        await request.read()
+        return web.Response(status=statuses[request.path])
+
+    app = web.Application()
+    app.router.add_post("/{tail:.*}", handle)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    await web.TCPSite(runner, "127.0.0.1", 0).start()
+    host, port = runner.addresses[0][:2]
+    yield f"http://{host}:{port}", requests
+    await runner.cleanup()
 
 
 async def test_evaluator_delivers_push_and_prunes_gone_subscriptions(
@@ -114,3 +184,10 @@ async def test_test_notification_fails_without_any_channel(client: httpx.AsyncCl
     assert user.ntfy_enabled is True  # but NTFY_URL is unset in tests, so delivery fails
     response = await client.post("/api/v1/notifications/test")
     assert response.status_code == 502
+
+
+@pytest.mark.parametrize("subject", ["mailto:a@b", "admin@example.com", "http://plants.example"])
+def test_malformed_vapid_subject_fails_at_startup(subject: str):
+    # py_vapid would only reject these when signing, failing every push silently.
+    with pytest.raises(ValidationError):
+        Settings(VAPID_SUBJECT=subject)

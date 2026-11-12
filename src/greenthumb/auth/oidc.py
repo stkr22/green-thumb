@@ -16,7 +16,7 @@ from urllib.parse import urlencode
 
 import httpx
 from joserfc import jwt
-from joserfc.errors import JoseError
+from joserfc.errors import InvalidKeyIdError, JoseError
 from joserfc.jwk import KeySet
 
 from greenthumb.config import get_settings
@@ -25,6 +25,14 @@ from greenthumb.models.base import utcnow
 logger = logging.getLogger(__name__)
 
 _CACHE_TTL = timedelta(hours=1)
+# An unknown kid usually means the provider rotated its keys, so JWKS is refetched
+# early, but at most this often so a stream of bogus tokens can't hammer the IdP.
+_JWKS_MIN_REFRESH_INTERVAL = timedelta(minutes=1)
+# Never accept "none" or HMAC: an HS256 token "signed" with a public RSA key
+# would otherwise verify. Only the asymmetric algorithms providers actually use.
+_ASYMMETRIC_ALGORITHMS = frozenset(
+    {"RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA"}
+)
 # Tolerated clock skew between us and the identity provider when validating exp/iat.
 _CLOCK_SKEW_LEEWAY_SECONDS = 120
 
@@ -62,11 +70,13 @@ class OIDCClient:
         self._discovery_fetched_at = now
         return self._discovery
 
-    async def _get_jwks(self) -> KeySet:
-        """Fetch and cache the provider's signing keys."""
+    async def _get_jwks(self, *, force: bool = False) -> KeySet:
+        """Fetch and cache the provider's signing keys (``force`` skips the TTL, not the rate limit)."""
         now = utcnow()
-        if self._jwks and self._jwks_fetched_at and now - self._jwks_fetched_at < _CACHE_TTL:
-            return self._jwks
+        if self._jwks and self._jwks_fetched_at:
+            age = now - self._jwks_fetched_at
+            if age < (_JWKS_MIN_REFRESH_INTERVAL if force else _CACHE_TTL):
+                return self._jwks
         discovery = await self._get_discovery()
         try:
             async with httpx.AsyncClient() as client:
@@ -103,7 +113,7 @@ class OIDCClient:
             "code": code,
             "redirect_uri": settings.OIDC_REDIRECT_URI,
             "client_id": settings.OIDC_CLIENT_ID,
-            "client_secret": settings.OIDC_CLIENT_SECRET,
+            "client_secret": settings.OIDC_CLIENT_SECRET.get_secret_value(),
             "code_verifier": code_verifier,
         }
         try:
@@ -114,28 +124,36 @@ class OIDCClient:
             raise OIDCError(f"Token exchange failed: {e}") from e
         return response.json()
 
+    async def _signing_algorithms(self) -> list[str]:
+        """Algorithms the provider advertises for ID tokens, restricted to asymmetric ones."""
+        advertised = (await self._get_discovery()).get("id_token_signing_alg_values_supported") or ["RS256"]
+        allowed = [alg for alg in advertised if alg in _ASYMMETRIC_ALGORITHMS]
+        if not allowed:
+            raise OIDCError(f"Provider advertises no supported ID token algorithm: {advertised}")
+        return allowed
+
     async def validate_id_token(self, id_token: str, nonce: str) -> dict[str, Any]:
         """Verify the ID token signature and claims; return the validated claims."""
         settings = get_settings()
-        keys = await self._get_jwks()
+        algorithms = await self._signing_algorithms()
         try:
-            decoded = jwt.decode(id_token, keys)
+            try:
+                decoded = jwt.decode(id_token, await self._get_jwks(), algorithms=algorithms)
+            except InvalidKeyIdError:
+                decoded = jwt.decode(id_token, await self._get_jwks(force=True), algorithms=algorithms)
             registry = jwt.JWTClaimsRegistry(
                 iss={"essential": True, "value": settings.OIDC_ISSUER_URL.rstrip("/")},
                 sub={"essential": True},
+                aud={"essential": True, "value": settings.OIDC_CLIENT_ID},
+                nonce={"essential": True, "value": nonce},
+                exp={"essential": True},
+                iat={"essential": True},
                 leeway=_CLOCK_SKEW_LEEWAY_SECONDS,
             )
             registry.validate(decoded.claims)
         except JoseError as e:
             raise OIDCError(f"ID token validation failed: {e}") from e
-        claims = dict(decoded.claims)
-        aud = claims.get("aud", [])
-        aud_list = aud if isinstance(aud, list) else [aud]
-        if settings.OIDC_CLIENT_ID not in aud_list:
-            raise OIDCError("ID token audience does not include our client_id")
-        if claims.get("nonce") != nonce:
-            raise OIDCError("ID token nonce mismatch")
-        return claims
+        return dict(decoded.claims)
 
     async def fetch_userinfo(self, access_token: str) -> dict[str, Any]:
         """Fetch userinfo claims; used when the ID token lacks email/name."""
@@ -185,9 +203,3 @@ def get_oidc_client() -> OIDCClient:
     if _client is None:
         _client = OIDCClient()
     return _client
-
-
-def reset_oidc_client() -> None:
-    """Drop the cached client (used by tests)."""
-    global _client  # noqa: PLW0603 - intentional lazy singleton
-    _client = None

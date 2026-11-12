@@ -3,6 +3,8 @@
 from datetime import UTC, datetime
 
 from sqlalchemy import DateTime
+from sqlalchemy.engine import Dialect
+from sqlalchemy.types import TypeDecorator
 
 
 def utcnow() -> datetime:
@@ -10,17 +12,31 @@ def utcnow() -> datetime:
     return datetime.now(UTC)
 
 
-def ensure_utc(value: datetime) -> datetime:
-    """Attach UTC to naive datetimes.
+class UTCDateTime(TypeDecorator[datetime]):
+    """Timestamp that is always timezone-aware UTC in Python.
 
-    SQLite stores datetimes without timezone info, so reads come back naive;
-    everything we store is UTC by contract.
+    SQLite has no timezone-aware datetime type: it stores the wall-clock fields
+    and drops the offset, so reads came back naive and every comparison or API
+    response had to patch UTC back in. Normalising at the column boundary makes
+    that impossible to forget: binds are converted to UTC (an aware value in
+    another zone would otherwise be stored with the wrong wall-clock time) and
+    results always carry UTC.
     """
-    if value.tzinfo is None:
-        return value.replace(tzinfo=UTC)
-    return value
+
+    impl = DateTime(timezone=True)
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect: Dialect) -> datetime | None:  # noqa: ARG002
+        """Store UTC wall-clock time; naive input is UTC by contract."""
+        if value is None or value.tzinfo is None:
+            return value
+        return value.astimezone(UTC).replace(tzinfo=None)
+
+    def process_result_value(self, value: datetime | None, dialect: Dialect) -> datetime | None:  # noqa: ARG002
+        """Attach UTC to the stored wall-clock time."""
+        return value.replace(tzinfo=UTC) if value is not None else None
 
 
-def utc_datetime_type() -> DateTime:
-    """Timestamp column type (timezone-aware; stored naive on SQLite)."""
-    return DateTime(timezone=True)
+def utc_datetime_type() -> UTCDateTime:
+    """Timestamp column type (see UTCDateTime)."""
+    return UTCDateTime()

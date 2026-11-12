@@ -1,6 +1,6 @@
 """Plant CRUD, filtering, and cover photo tests."""
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import httpx
 from sqlmodel import select
@@ -131,3 +131,13 @@ async def test_cover_photo_must_belong_to_plant(
     accepted = await client.post(f"/api/v1/plants/{other.id}/cover", json={"photo_id": str(photo.id)})
     assert accepted.status_code == 200
     assert accepted.json()["cover_photo_id"] == str(photo.id)
+
+
+async def test_timestamps_are_utc_aware_on_every_read_path(client: httpx.AsyncClient, plant: Plant):
+    # SQLite drops offsets; the API must still return them, both for plain
+    # columns and for aggregates such as the last-watered max().
+    await client.post(f"/api/v1/plants/{plant.id}/logs", json={"event_type": "watering"})
+    detail = (await client.get(f"/api/v1/plants/{plant.id}")).json()
+    listed = (await client.get("/api/v1/plants")).json()[0]
+    for value in (detail["created_at"], listed["last_watered_at"]):
+        assert datetime.fromisoformat(value).utcoffset() == timedelta(0)

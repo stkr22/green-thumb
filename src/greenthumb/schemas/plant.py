@@ -26,13 +26,16 @@ class PlantCreate(SQLModel):
 class PlantUpdate(SQLModel):
     """Partial update for a plant; only provided fields are changed."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=200)
+    # NOT NULL columns are typed non-optional with a None default: omitting the
+    # field leaves it unchanged, while an explicit null is a 422 instead of an
+    # IntegrityError. Nullable columns keep `| None` so null clears them.
+    name: str = Field(default=None, min_length=1, max_length=200)
     species_name: str | None = None
     scientific_name: str | None = None
     species_id: uuid.UUID | None = None
     location_id: uuid.UUID | None = None
     notes: str | None = None
-    tags: list[str] | None = None
+    tags: list[str] = Field(default=None)
 
 
 class PlantRead(SQLModel):

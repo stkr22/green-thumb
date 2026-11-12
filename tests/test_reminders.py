@@ -39,7 +39,7 @@ async def test_reminder_list_computes_due_at(
     await add_care_log(session, plant.id, user.id, event_type="watering", logged_at=watered_at)
 
     listed = {item["event_type"]: item for item in (await client.get(f"/api/v1/plants/{plant.id}/reminders")).json()}
-    assert datetime.fromisoformat(listed["watering"]["due_at"]).replace(tzinfo=UTC) == watered_at + timedelta(days=7)
+    assert datetime.fromisoformat(listed["watering"]["due_at"]) == watered_at + timedelta(days=7)
     # No fertilising event yet: due immediately, signalled by a null due_at.
     assert listed["fertilising"]["due_at"] is None
 
@@ -59,7 +59,7 @@ async def test_snooze_defaults_to_interval(client: httpx.AsyncClient, plant: Pla
     before = datetime.now(UTC)
     snoozed = await client.post(f"/api/v1/reminders/{reminder['id']}/snooze", json={})
     assert snoozed.status_code == 200
-    snoozed_until = datetime.fromisoformat(snoozed.json()["snoozed_until"]).replace(tzinfo=UTC)
+    snoozed_until = datetime.fromisoformat(snoozed.json()["snoozed_until"])
     assert before + timedelta(days=7) <= snoozed_until <= datetime.now(UTC) + timedelta(days=7)
 
 
@@ -69,7 +69,7 @@ async def test_snooze_custom_days(client: httpx.AsyncClient, plant: Plant):
     ).json()
 
     snoozed = await client.post(f"/api/v1/reminders/{reminder['id']}/snooze", json={"days": 2})
-    snoozed_until = datetime.fromisoformat(snoozed.json()["snoozed_until"]).replace(tzinfo=UTC)
+    snoozed_until = datetime.fromisoformat(snoozed.json()["snoozed_until"])
     assert snoozed_until <= datetime.now(UTC) + timedelta(days=2)
     assert snoozed_until > datetime.now(UTC) + timedelta(days=1)
 
@@ -102,11 +102,11 @@ async def test_reminder_list_due_at_reflects_snooze(
     # A snooze beyond the regular schedule wins.
     await client.post(f"/api/v1/reminders/{reminder['id']}/snooze", json={"days": 30})
     listed = (await client.get(f"/api/v1/plants/{plant.id}/reminders")).json()[0]
-    due_at = datetime.fromisoformat(listed["due_at"]).replace(tzinfo=UTC)
+    due_at = datetime.fromisoformat(listed["due_at"])
     assert due_at > watered_at + timedelta(days=7)
 
     # A snooze earlier than the regular schedule leaves it untouched.
     await client.post(f"/api/v1/reminders/{reminder['id']}/snooze", json={"days": 2})
     listed = (await client.get(f"/api/v1/plants/{plant.id}/reminders")).json()[0]
-    due_at = datetime.fromisoformat(listed["due_at"]).replace(tzinfo=UTC)
+    due_at = datetime.fromisoformat(listed["due_at"])
     assert due_at == watered_at + timedelta(days=7)

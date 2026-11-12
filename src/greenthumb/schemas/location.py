@@ -16,7 +16,10 @@ class LocationCreate(SQLModel):
 class LocationUpdate(SQLModel):
     """Partial update for a location."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=200)
+    # NOT NULL columns are typed non-optional with a None default: omitting the
+    # field leaves it unchanged, while an explicit null is a 422 instead of an
+    # IntegrityError. Nullable columns keep `| None` so null clears them.
+    name: str = Field(default=None, min_length=1, max_length=200)
     description: str | None = None
 
 

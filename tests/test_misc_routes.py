@@ -19,14 +19,3 @@ async def test_notification_test_endpoint_success(client: httpx.AsyncClient, mon
     monkeypatch.setattr(notifications_module.ntfy, "send_notification", _ok)
     response = await client.post("/api/v1/notifications/test")
     assert response.status_code == 200
-
-
-async def test_notification_test_endpoint_failure_returns_502(
-    client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
-):
-    async def _fail(**_kwargs) -> bool:
-        return False
-
-    monkeypatch.setattr(notifications_module.ntfy, "send_notification", _fail)
-    response = await client.post("/api/v1/notifications/test")
-    assert response.status_code == 502

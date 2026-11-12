@@ -8,7 +8,6 @@ from sqlmodel import col, func, select
 from sqlmodel.ext.asyncio.session import AsyncSession
 
 from greenthumb.models import CareLog
-from greenthumb.models.base import ensure_utc
 
 WATERING = "watering"
 
@@ -21,7 +20,7 @@ async def last_event_per_type(session: AsyncSession, plant_id: uuid.UUID) -> dic
         .group_by(col(CareLog.event_type))
     )
     rows = (await session.exec(statement)).all()
-    return {event_type: ensure_utc(logged_at) for event_type, logged_at in rows}
+    return dict(rows)
 
 
 async def last_watered_map(session: AsyncSession, plant_ids: Iterable[uuid.UUID]) -> dict[uuid.UUID, datetime]:
@@ -35,4 +34,4 @@ async def last_watered_map(session: AsyncSession, plant_ids: Iterable[uuid.UUID]
         .group_by(col(CareLog.plant_id))
     )
     rows = (await session.exec(statement)).all()
-    return {plant_id: ensure_utc(logged_at) for plant_id, logged_at in rows}
+    return dict(rows)

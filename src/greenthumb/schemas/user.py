@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from sqlmodel import SQLModel
+from sqlmodel import Field, SQLModel
 
 
 class UserRead(SQLModel):
@@ -20,7 +20,10 @@ class UserRead(SQLModel):
 class UserUpdate(SQLModel):
     """Mutable user preferences; identity fields come from OIDC and are read-only."""
 
-    ntfy_enabled: bool | None = None
+    # NOT NULL columns are typed non-optional with a None default: omitting the
+    # field leaves it unchanged, while an explicit null is a 422 instead of an
+    # IntegrityError. Nullable columns keep `| None` so null clears them.
+    ntfy_enabled: bool = Field(default=None)
     ntfy_topic_override: str | None = None
 
 

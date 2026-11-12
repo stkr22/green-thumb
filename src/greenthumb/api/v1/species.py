@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import col, func, select, update
+from sqlmodel import col, func, select
 
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Plant, Species
@@ -89,8 +89,5 @@ async def apply_season_plan(species_id: uuid.UUID, session: SessionDep, _user: C
 async def delete_species(species_id: uuid.UUID, session: SessionDep, _user: CurrentUser) -> None:
     """Delete a species; plants that referenced it keep existing unlinked."""
     species = await get_species_or_404(session, species_id)
-    # Explicit detach instead of relying on ON DELETE SET NULL so behaviour is
-    # identical on the SQLite test backend (mirrors location deletion).
-    await session.exec(update(Plant).where(col(Plant.species_id) == species_id).values(species_id=None))  # type: ignore[call-overload]
     await session.delete(species)
     await session.commit()
