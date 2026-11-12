@@ -42,16 +42,23 @@ with SSO login through [Zitadel](https://zitadel.com).
 - **Backend:** FastAPI + SQLModel (async, aiosqlite), Alembic migrations, Python 3.14 — `src/greenthumb/`
 - **Frontend:** React 19 + TypeScript + Vite + Tailwind CSS 4 + TanStack Query 5 — `frontend/`
 - **Database:** SQLite (single file)
-- **Deployment:** Helm chart (`charts/green-thumb/`, published as an OCI artifact) synced by ArgoCD; docker-compose for local dev
+- **Deployment:** Helm chart (`charts/green-thumb/`, published as an OCI artifact) synced by ArgoCD; locally, uv + the Vite dev server
 - **Interactive API docs:** Swagger UI at `/docs` on a running backend
 
 ## Quick start (local development)
 
 ```bash
-cp .env.local.example .env.local   # fill in OIDC credentials
-docker compose up --build
-# Frontend: http://localhost:5173 — API docs: http://localhost:8000/docs
+uv sync --group dev
+cp .env.example .env               # set SESSION_SECRET_KEY; add OIDC values for real login
+uv run alembic upgrade head
+uv run uvicorn greenthumb.main:app --reload    # API on :8000, docs at /docs
+
+cd frontend && npm ci && npm run dev           # SPA on http://localhost:5173
 ```
+
+No Zitadel at hand? Leave `OIDC_ISSUER_URL` empty, start the backend with
+`DEV_AUTH_BYPASS=true`, and open `http://localhost:5173/auth/dev-login`. See
+[docs/setup.md](docs/setup.md#local-development).
 
 ## Documentation
 
@@ -60,7 +67,7 @@ Full documentation lives in [docs/](docs/):
 | Document | For whom | Contents |
 | --- | --- | --- |
 | [user-guide.md](docs/user-guide.md) | Everyday users | Signing in, managing plants/locations, logging care, reminders, calendar, notifications |
-| [setup.md](docs/setup.md) | Operators deploying it | Local development, docker-compose, Kubernetes/ArgoCD, building images |
+| [setup.md](docs/setup.md) | Operators deploying it | Local development, Kubernetes/ArgoCD, building images |
 | [administration.md](docs/administration.md) | Operators running it | Configuration reference, Zitadel/ntfy setup, backups, migrations, monitoring, security, troubleshooting |
 | [architecture.md](docs/architecture.md) | Developers & curious operators | Tech stack, auth flow, reminder engine, data model, API reference |
 | [development.md](docs/development.md) | Contributors | Running locally, tests, e2e, regenerating API types, conventions |

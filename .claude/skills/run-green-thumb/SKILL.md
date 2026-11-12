@@ -13,7 +13,8 @@ Two processes: the FastAPI backend on `:8000` and the Vite dev server on
 
 ```bash
 (ss -ltn 2>/dev/null || netstat -ltn) | grep -E ':(8000|5173)'   # expect no output
-uv run alembic upgrade head                                      # local dev DB: ./greenthumb.db
+# Settings require a 32+ char SESSION_SECRET_KEY, even just to migrate.
+SESSION_SECRET_KEY=local-dev-secret-0123456789abcdef uv run alembic upgrade head   # local dev DB: ./greenthumb.db
 ```
 
 `greenthumb.db` is gitignored local dev data. Migrations are additive and
@@ -23,7 +24,7 @@ before doing anything destructive to it.
 ## 2. Start both servers in the background
 
 ```bash
-DEV_AUTH_BYPASS=true SESSION_COOKIE_SECURE=false SESSION_SECRET_KEY=local-dev-secret \
+DEV_AUTH_BYPASS=true SESSION_COOKIE_SECURE=false SESSION_SECRET_KEY=local-dev-secret-0123456789abcdef \
   uv run uvicorn greenthumb.main:app --port 8000
 
 cd frontend && npm run dev
@@ -92,7 +93,7 @@ await page.mouse.wheel(0, 900);
   or npm resolves the broken local install anyway:
 
   ```bash
-  SESSION_SECRET_KEY=x uv run python -c "import json; from greenthumb.main import app; open('openapi.json','w').write(json.dumps(app.openapi(), indent=2))"
+  SESSION_SECRET_KEY=$(openssl rand -hex 32) uv run python -c "import json; from greenthumb.main import app; open('openapi.json','w').write(json.dumps(app.openapi(), indent=2))"
   cd "$(mktemp -d)" && npx -y -p typescript@5.9.3 -p openapi-typescript@7.13.0 \
     openapi-typescript /workspaces/plant-manager/openapi.json \
     -o /workspaces/plant-manager/frontend/src/api/types.gen.ts

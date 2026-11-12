@@ -116,7 +116,9 @@ Open a plant to see everything about it and to take action:
   **+ Custom** for any other event type.
 - **Photos** — upload one or several images at once, set any photo as the
   **cover** (star icon), or delete photos (asks for confirmation). Deleting
-  the cover photo just clears the cover.
+  the cover photo just clears the cover. JPEG, PNG, WebP, GIF and AVIF up to
+  15 MB (and 64 megapixels) are accepted; every photo is stored as a resized
+  WebP, so the original file is not kept.
 - **Growth journal** — photos and care events merged into one month-by-month
   timeline of the plant's life.
 - **Care log** — a timeline of all events, filterable by type and paginated.
