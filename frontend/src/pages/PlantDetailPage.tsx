@@ -1,680 +1,92 @@
-import { useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import {
-  AlarmClock,
-  AlarmClockOff,
-  BellPlus,
-  Camera,
-  Droplets,
-  Leaf,
-  MapPin,
-  Pencil,
-  Plus,
-  Scissors,
-  Shovel,
-  Sprout,
-  Star,
-  Sun,
-  Trash2,
-  TriangleAlert,
-} from 'lucide-react';
+import { useState } from 'react';
+import { useSuspenseQuery } from '@tanstack/react-query';
+import { useNavigate, useParams } from 'react-router';
+import { Leaf, MapPin, Pencil, Trash2 } from 'lucide-react';
 
-import { photoUrl, thumbnailUrl } from '../api/client';
-import { useLocations } from '../api/hooks/useLocations';
-import { LOGS_PAGE_SIZE, useCreateLog, useDeleteLog, useLogs } from '../api/hooks/useLogs';
-import { useDeletePhoto, usePhotos, useUploadPhoto } from '../api/hooks/usePhotos';
-import {
-  useApplySpeciesDefaults,
-  useDeletePlant,
-  usePlant,
-  useSetCoverPhoto,
-  useUpdatePlant,
-} from '../api/hooks/usePlants';
-import {
-  useCreateReminder,
-  useDeleteReminder,
-  useReminders,
-  useSnoozeReminder,
-  useUnsnoozeReminder,
-  useUpdateReminder,
-} from '../api/hooks/useReminders';
-import type { PlantDetail, ReminderStatusRead } from '../api/types';
-import { CareEventChip } from '../components/CareEventChip';
+import { photoUrl } from '../api/client';
+import { useCreateLog } from '../api/hooks/useLogs';
+import { useDeletePlant, usePlant, useUpdatePlant } from '../api/hooks/usePlants';
+import { locationsQuery } from '../api/queries';
+import type { PlantDetail } from '../api/types';
+import { Field } from '../components/Field';
 import { GrowthJournal } from '../components/GrowthJournal';
 import { Modal } from '../components/Modal';
 import { PlantForm } from '../components/PlantForm';
-import { CardSkeleton, Skeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
-import { DEFAULT_CARE_EVENTS } from '../lib/careEvents';
-import { formatDate, formatDateTime, formatDaysAgo, formatDue } from '../lib/dates';
-import { MONTHS, paceLabel, windowLabel } from '../lib/seasons';
+import { CareActions } from '../components/plant/CareActions';
+import { CareGuide } from '../components/plant/CareGuide';
+import { CareLogTimeline } from '../components/plant/CareLogTimeline';
+import { PhotoGallery } from '../components/plant/PhotoGallery';
+import { RemindersSection } from '../components/plant/RemindersSection';
 
-const DUE_SOON_MS = 2 * 24 * 60 * 60 * 1000;
-
-function isSnoozed(reminder: ReminderStatusRead | undefined): boolean {
-  return Boolean(reminder?.snoozed_until && new Date(reminder.snoozed_until).getTime() > Date.now());
+function speciesLine(plant: PlantDetail): string {
+  const name = plant.species?.name ?? plant.species_name;
+  const scientific = plant.species?.scientific_name ?? plant.scientific_name;
+  return [name, scientific].filter(Boolean).join(' · ');
 }
 
-// One tappable card per default care type. The "last done" display and the
-// log buttons used to be separate elements, which invited taps on the read-only
-// half; merging them makes the whole card the action, with an Undo toast as
-// the safety net for accidental taps.
-function CareActions({ plant, onCustom }: { plant: PlantDetail; onCustom: () => void }) {
-  const createLog = useCreateLog(plant.id);
-  const deleteLog = useDeleteLog(plant.id);
-  const { data: reminders = [] } = useReminders(plant.id);
-  const { notify } = useToast();
-
-  return (
-    <div>
-      <div className="grid grid-cols-3 gap-2">
-        {DEFAULT_CARE_EVENTS.map((event) => {
-          const reminder = reminders.find((r) => r.event_type === event.eventType && r.enabled);
-          const snoozed = isSnoozed(reminder);
-          const msLeft = reminder?.due_at ? new Date(reminder.due_at).getTime() - Date.now() : null;
-          const overdue = reminder !== undefined && (msLeft === null || msLeft <= 0);
-          const dueSoon = msLeft !== null && msLeft > 0 && msLeft <= DUE_SOON_MS;
-          return (
-            <button
-              key={event.eventType}
-              type="button"
-              className="card flex flex-col items-start gap-1 p-3 text-left transition hover:shadow-md disabled:opacity-50"
-              disabled={createLog.isPending}
-              onClick={() =>
-                createLog.mutate(
-                  { event_type: event.eventType },
-                  {
-                    onSuccess: (log) =>
-                      notify(`${event.pastTense}`, 'success', {
-                        label: 'Undo',
-                        onClick: () => deleteLog.mutate(log.id),
-                      }),
-                  },
-                )
-              }
-            >
-              <span className={`rounded-full p-1.5 ${event.chip}`}>
-                <event.Icon className="h-4 w-4" />
-              </span>
-              <span className="text-sm font-medium">{event.verb}</span>
-              <span className="text-xs text-stone-500">
-                {event.pastTense} {formatDaysAgo(plant.last_events?.[event.eventType])}
-              </span>
-              {reminder &&
-                (snoozed ? (
-                  <span className="text-xs text-stone-400">snoozed</span>
-                ) : overdue ? (
-                  <span className="text-xs font-medium text-red-600">{formatDue(reminder.due_at ?? null)}</span>
-                ) : dueSoon ? (
-                  <span className="text-xs font-medium text-amber-600">{formatDue(reminder.due_at)}</span>
-                ) : null)}
-            </button>
-          );
-        })}
-      </div>
-      <div className="mt-2">
-        <button type="button" className="btn-secondary" onClick={onCustom}>
-          <Plus className="h-4 w-4" />
-          Custom
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function CareGuide({ plant }: { plant: PlantDetail }) {
-  const applyDefaults = useApplySpeciesDefaults(plant.id);
-  const { notify } = useToast();
-  const species = plant.species;
-  if (!species) return null;
-
-  const hints = [
-    { icon: Sun, label: 'Light', value: species.light },
-    { icon: Droplets, label: 'Watering', value: species.watering_hint },
-    { icon: Shovel, label: 'Soil & repotting', value: species.soil_hint },
-    {
-      icon: Scissors,
-      label: 'Deadheading',
-      value: species.deadheading ? (species.deadheading_hint ?? 'Remove spent blooms regularly') : null,
-    },
-    { icon: TriangleAlert, label: 'Toxicity', value: species.toxicity },
-  ].filter((hint) => hint.value);
-  const hasDefaults = Object.keys(species.default_intervals).length > 0;
-  if (hints.length === 0 && !species.common_issues && !hasDefaults) return null;
-
-  return (
-    <section className="card p-5">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 font-semibold">
-          <Sprout className="h-4 w-4 text-emerald-600" />
-          Care guide
-          <span className="text-sm font-normal italic text-stone-500">{species.name}</span>
-        </h2>
-        {hasDefaults && (
-          <button
-            type="button"
-            className="btn-secondary"
-            disabled={applyDefaults.isPending}
-            onClick={() =>
-              applyDefaults.mutate(undefined, {
-                onSuccess: (created) =>
-                  notify(
-                    created.length > 0
-                      ? `${created.length} reminder${created.length === 1 ? '' : 's'} added`
-                      : 'All default reminders already exist',
-                  ),
-              })
-            }
-          >
-            <BellPlus className="h-4 w-4" />
-            Apply default care plan
-          </button>
-        )}
-      </div>
-      {hints.length > 0 && (
-        <dl className="grid gap-3 sm:grid-cols-2">
-          {hints.map(({ icon: Icon, label, value }) => (
-            <div key={label} className="flex items-start gap-2">
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-              <div>
-                <dt className="text-sm font-medium">{label}</dt>
-                <dd className="text-sm text-stone-600">{value}</dd>
-              </div>
-            </div>
-          ))}
-        </dl>
-      )}
-      {species.common_issues && (
-        <div className={hints.length > 0 ? 'mt-4' : ''}>
-          <h3 className="mb-1 text-sm font-medium">Common issues & how to spot them</h3>
-          <p className="whitespace-pre-line text-sm text-stone-600">{species.common_issues}</p>
-        </div>
-      )}
-    </section>
-  );
-}
-
-function PhotoGallery({ plantId, coverPhotoId }: { plantId: string; coverPhotoId: string | null }) {
-  const { data: photos = [] } = usePhotos(plantId);
-  const uploadPhoto = useUploadPhoto(plantId);
-  const deletePhoto = useDeletePhoto(plantId);
-  const setCover = useSetCoverPhoto(plantId);
-  const { notify } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [uploading, setUploading] = useState(0);
-
-  const uploadFiles = async (files: FileList) => {
-    setUploading(files.length);
-    try {
-      // Sequential keeps the requests small-server friendly and the counter honest.
-      for (const file of Array.from(files)) {
-        await uploadPhoto.mutateAsync(file);
-        setUploading((count) => count - 1);
-      }
-    } finally {
-      setUploading(0);
-    }
-  };
-
-  return (
-    <section className="card p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold">Photos</h2>
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={uploading > 0}
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <Camera className="h-4 w-4" />
-          {uploading > 0 ? `Uploading ${uploading}…` : 'Upload'}
-        </button>
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          className="hidden"
-          onChange={(event) => {
-            if (event.target.files?.length) void uploadFiles(event.target.files);
-            event.target.value = '';
-          }}
-        />
-      </div>
-      {photos.length === 0 ? (
-        <p className="text-sm text-stone-500">No photos yet.</p>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-          {photos.map((photo) => (
-            <div key={photo.id} className="group relative">
-              <img src={thumbnailUrl(photo.id)} alt="" className="h-32 w-full rounded-lg object-cover" />
-              {/* Always visible on touch screens; hover/focus-revealed on desktop. */}
-              <div className="absolute inset-0 flex items-end justify-between rounded-lg bg-black/20 p-2 sm:bg-black/30 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100 sm:group-focus-within:opacity-100">
-                <button
-                  type="button"
-                  title={photo.id === coverPhotoId ? 'Current cover photo' : 'Set as cover photo'}
-                  className="rounded bg-white/90 p-1.5 text-amber-500 hover:bg-white"
-                  onClick={() => setCover.mutate(photo.id)}
-                >
-                  <Star className="h-4 w-4" fill={photo.id === coverPhotoId ? 'currentColor' : 'none'} />
-                </button>
-                <button
-                  type="button"
-                  title="Delete photo"
-                  className="rounded bg-white/90 p-1.5 text-red-600 hover:bg-white"
-                  onClick={() => {
-                    // Unlike logs/reminders, a photo can't be restored client-side.
-                    if (window.confirm('Delete this photo? This cannot be undone.')) {
-                      deletePhoto.mutate(photo.id, { onSuccess: () => notify('Photo deleted') });
-                    }
-                  }}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function CareLogTimeline({ plantId }: { plantId: string }) {
-  const [eventType, setEventType] = useState('');
-  const [page, setPage] = useState(0);
-  const { data: logs = [] } = useLogs(plantId, eventType || undefined, page);
-  const deleteLog = useDeleteLog(plantId);
+function CustomLogForm({ plantId, onDone }: { plantId: string; onDone: () => void }) {
   const createLog = useCreateLog(plantId);
   const { notify } = useToast();
+  const [eventType, setEventType] = useState('');
+  const [notes, setNotes] = useState('');
 
   return (
-    <section className="card p-5">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="font-semibold">Care log</h2>
-        <select
-          className="input-base w-40"
-          value={eventType}
-          onChange={(event) => {
-            setEventType(event.target.value);
-            setPage(0);
-          }}
-        >
-          <option value="">All events</option>
-          {DEFAULT_CARE_EVENTS.map((event) => (
-            <option key={event.eventType} value={event.eventType}>
-              {event.label}
-            </option>
-          ))}
-        </select>
-      </div>
-      {logs.length === 0 ? (
-        <p className="text-sm text-stone-500">No care events logged{page > 0 ? ' on this page' : ' yet'}.</p>
-      ) : (
-        <ul className="divide-y divide-stone-100">
-          {logs.map((log) => (
-            <li key={log.id} className="flex items-center justify-between py-2">
-              <div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <CareEventChip eventType={log.event_type} />
-                  <span className="text-sm text-stone-500">{formatDateTime(log.logged_at)}</span>
-                </div>
-                {log.notes && <p className="mt-1 text-sm text-stone-500">{log.notes}</p>}
-              </div>
-              <button
-                type="button"
-                title="Delete log entry"
-                className="text-stone-400 hover:text-red-600"
-                onClick={() =>
-                  deleteLog.mutate(log.id, {
-                    onSuccess: () =>
-                      // Undo recreates the entry with its original timestamp.
-                      notify(`${log.event_type} entry deleted`, 'success', {
-                        label: 'Undo',
-                        onClick: () =>
-                          createLog.mutate({
-                            event_type: log.event_type,
-                            notes: log.notes,
-                            logged_at: log.logged_at,
-                          }),
-                      }),
-                  })
-                }
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-      <div className="mt-3 flex gap-2">
-        <button type="button" className="btn-secondary" disabled={page === 0} onClick={() => setPage(page - 1)}>
-          Previous
-        </button>
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={logs.length < LOGS_PAGE_SIZE}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
-      </div>
-    </section>
-  );
-}
-
-// Matching the quick-action event types exactly is what links a reminder to
-// its care logs, so the picker offers them instead of free text (typo-proof);
-// "custom" still allows arbitrary event types.
-const CUSTOM_EVENT = '__custom__';
-
-/** Snoozing defers by the current season's pace, so the label has to match. */
-function snoozeDays(reminder: ReminderStatusRead): number {
-  return reminder.effective_interval_days ?? reminder.interval_days;
-}
-
-/** How often this reminder currently fires, labelled with the season when it differs. */
-function ReminderPace({ reminder }: { reminder: ReminderStatusRead }) {
-  if (reminder.window_start_month && reminder.window_end_month) {
-    return (
-      <span className="text-sm text-stone-500">
-        every {reminder.interval_days} days
-        <span className="text-stone-400">
-          {' '}
-          · in {windowLabel(reminder.window_start_month, reminder.window_end_month)}
-        </span>
-      </span>
-    );
-  }
-  if (reminder.paused) {
-    return <span className="text-sm text-stone-500">every {reminder.interval_days} days in season</span>;
-  }
-  const days = reminder.effective_interval_days ?? reminder.interval_days;
-  return (
-    <span className="text-sm text-stone-500">
-      every {days} days
-      {days !== reminder.interval_days && <span className="text-stone-400"> · {paceLabel(reminder.season)}</span>}
-    </span>
-  );
-}
-
-function ReminderDueLabel({
-  dueAt,
-  enabled,
-  snoozedUntil,
-  paused,
-  season,
-}: {
-  dueAt: string | null;
-  enabled: boolean;
-  snoozedUntil: string | null;
-  paused: boolean;
-  season: string;
-}) {
-  // "off" rather than "paused": seasonal pausing is a separate, automatic state.
-  if (!enabled) return <span className="text-sm text-stone-400">off</span>;
-  if (paused) {
-    return (
-      <span className="text-sm text-stone-400">
-        paused for {season}
-        {dueAt && ` · resumes ${formatDate(dueAt)}`}
-      </span>
-    );
-  }
-  if (snoozedUntil && new Date(snoozedUntil).getTime() > Date.now()) {
-    return <span className="text-sm text-stone-400">snoozed until {formatDate(snoozedUntil)}</span>;
-  }
-  const label = formatDue(dueAt);
-  const overdue = !dueAt || new Date(dueAt).getTime() <= Date.now();
-  return <span className={`text-sm ${overdue ? 'font-medium text-red-600' : 'text-stone-500'}`}>{label}</span>;
-}
-
-function RemindersSection({ plantId }: { plantId: string }) {
-  const { data: reminders = [] } = useReminders(plantId);
-  const createReminder = useCreateReminder(plantId);
-  const updateReminder = useUpdateReminder(plantId);
-  const deleteReminder = useDeleteReminder(plantId);
-  const snoozeReminder = useSnoozeReminder();
-  const unsnoozeReminder = useUnsnoozeReminder();
-  const { notify } = useToast();
-  const [eventChoice, setEventChoice] = useState('watering');
-  const [customEvent, setCustomEvent] = useState('');
-  const [intervalDays, setIntervalDays] = useState(7);
-  // Empty means a plain interval; a month pair makes it an annual-window
-  // reminder, whose due date waits for those months.
-  const [window, setWindow] = useState<[number, number] | null>(null);
-
-  return (
-    <section className="card p-5">
-      <h2 className="mb-3 font-semibold">Reminders</h2>
-      {reminders.length === 0 ? (
-        <p className="mb-3 text-sm text-stone-500">No reminders configured.</p>
-      ) : (
-        <ul className="mb-4 divide-y divide-stone-100">
-          {reminders.map((reminder) => (
-            <li key={reminder.id} className="flex flex-wrap items-center justify-between gap-2 py-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <CareEventChip eventType={reminder.event_type} />
-                <ReminderPace reminder={reminder} />
-                <ReminderDueLabel
-                  dueAt={reminder.due_at ?? null}
-                  enabled={reminder.enabled}
-                  snoozedUntil={reminder.snoozed_until ?? null}
-                  paused={reminder.paused}
-                  season={reminder.season}
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-sm text-stone-500">
-                  <input
-                    type="checkbox"
-                    checked={reminder.enabled}
-                    onChange={(event) =>
-                      updateReminder.mutate({ id: reminder.id, enabled: event.target.checked })
-                    }
-                  />
-                  enabled
-                </label>
-                {isSnoozed(reminder) ? (
-                  <button
-                    type="button"
-                    title="Cancel snooze"
-                    className="text-stone-400 hover:text-emerald-600"
-                    disabled={unsnoozeReminder.isPending}
-                    onClick={() => unsnoozeReminder.mutate({ reminderId: reminder.id, plantId })}
-                  >
-                    <AlarmClockOff className="h-4 w-4" />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    title={`Snooze for ${snoozeDays(reminder)} days`}
-                    className="text-stone-400 hover:text-emerald-600"
-                    disabled={snoozeReminder.isPending}
-                    onClick={() =>
-                      snoozeReminder.mutate(
-                        { reminderId: reminder.id, plantId },
-                        {
-                          onSuccess: () =>
-                            notify(`${reminder.event_type} snoozed for ${snoozeDays(reminder)} days`, 'success', {
-                              label: 'Undo',
-                              onClick: () => unsnoozeReminder.mutate({ reminderId: reminder.id, plantId }),
-                            }),
-                        },
-                      )
-                    }
-                  >
-                    <AlarmClock className="h-4 w-4" />
-                  </button>
-                )}
-                <button
-                  type="button"
-                  title="Delete reminder"
-                  className="text-stone-400 hover:text-red-600"
-                  onClick={() =>
-                    deleteReminder.mutate(reminder.id, {
-                      onSuccess: () =>
-                        notify(`${reminder.event_type} reminder deleted`, 'success', {
-                          label: 'Undo',
-                          onClick: () =>
-                            createReminder.mutate({
-                              event_type: reminder.event_type,
-                              interval_days: reminder.interval_days,
-                              enabled: reminder.enabled,
-                              // Undo has to restore the schedule too, or the
-                              // reminder comes back on a different cadence.
-                              season_multipliers: reminder.season_multipliers,
-                              schedule_kind: reminder.schedule_kind === 'annual_window' ? 'annual_window' : 'interval',
-                              window_start_month: reminder.window_start_month,
-                              window_end_month: reminder.window_end_month,
-                            }),
-                        }),
-                    })
-                  }
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
-      <form
-        className="flex flex-wrap items-end gap-2"
-        onSubmit={(event) => {
-          event.preventDefault();
-          const eventType = eventChoice === CUSTOM_EVENT ? customEvent.trim() : eventChoice;
-          if (!eventType) return;
-          createReminder.mutate(
-            {
-              event_type: eventType,
-              interval_days: intervalDays,
-              enabled: true,
-              schedule_kind: window ? ('annual_window' as const) : ('interval' as const),
-              window_start_month: window?.[0],
-              window_end_month: window?.[1],
+    <form
+      className="flex flex-col gap-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        const type = eventType.trim();
+        if (!type) return;
+        createLog.mutate(
+          { event_type: type, notes: notes || null },
+          {
+            onSuccess: () => {
+              notify(`${type} logged`);
+              onDone();
             },
-            { onSuccess: () => setCustomEvent('') },
-          );
-        }}
-      >
-        <div>
-          <label className="mb-1 block text-xs text-stone-500">Event</label>
-          <select
-            className="input-base w-36"
-            aria-label="Event"
-            value={eventChoice}
-            onChange={(e) => setEventChoice(e.target.value)}
-          >
-            {DEFAULT_CARE_EVENTS.map(({ eventType, label }) => (
-              <option key={eventType} value={eventType}>
-                {label}
-              </option>
-            ))}
-            <option value={CUSTOM_EVENT}>Custom…</option>
-          </select>
-        </div>
-        {eventChoice === CUSTOM_EVENT && (
-          <div>
-            <label className="mb-1 block text-xs text-stone-500">Custom event</label>
-            <input
-              className="input-base w-36"
-              aria-label="Custom event"
-              placeholder="misting"
-              value={customEvent}
-              onChange={(e) => setCustomEvent(e.target.value)}
-            />
-          </div>
-        )}
-        <div>
-          <label className="mb-1 block text-xs text-stone-500">Every (days)</label>
+          },
+        );
+      }}
+    >
+      <Field label="Event type">
+        {(id) => (
           <input
-            type="number"
-            min={1}
-            className="input-base w-28"
-            aria-label="Every (days)"
-            value={intervalDays}
-            onChange={(e) => setIntervalDays(Number(e.target.value))}
+            id={id}
+            className="input-base"
+            placeholder="misting, pruning, …"
+            required
+            value={eventType}
+            onChange={(e) => setEventType(e.target.value)}
           />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-stone-500">Only in</label>
-          <select
-            className="input-base w-32"
-            aria-label="Window start month"
-            value={window ? window[0] : ''}
-            onChange={(e) => {
-              const month = Number.parseInt(e.target.value, 10);
-              setWindow(month > 0 ? [month, window?.[1] ?? month] : null);
-            }}
-          >
-            <option value="">Any month</option>
-            {MONTHS.map((label, index) => (
-              <option key={label} value={index + 1}>
-                {label}
-              </option>
-            ))}
-          </select>
-        </div>
-        {window && (
-          <div>
-            <label className="mb-1 block text-xs text-stone-500">through</label>
-            <select
-              className="input-base w-32"
-              aria-label="Window end month"
-              value={window[1]}
-              onChange={(e) => setWindow([window[0], Number.parseInt(e.target.value, 10)])}
-            >
-              {MONTHS.map((label, index) => (
-                <option key={label} value={index + 1}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </div>
         )}
-        <button type="submit" className="btn-primary" disabled={createReminder.isPending}>
-          <Plus className="h-4 w-4" />
-          Add
-        </button>
-      </form>
-    </section>
+      </Field>
+      <Field label="Notes (optional)">
+        {(id) => (
+          <textarea id={id} className="input-base" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+        )}
+      </Field>
+      <button type="submit" className="btn-primary self-start" disabled={createLog.isPending}>
+        Log event
+      </button>
+    </form>
   );
 }
 
 export function PlantDetailPage() {
-  const { id } = useParams<{ id: string }>();
-  const plantId = id ?? '';
+  const { id = '' } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { notify } = useToast();
-  const { data: plant, isLoading } = usePlant(plantId);
-  const { data: locations = [] } = useLocations();
-  const updatePlant = useUpdatePlant(plantId);
+  // Both awaited by the route loader; a missing plant ends up on RouteError.
+  const { data: plant } = usePlant(id);
+  const { data: locations } = useSuspenseQuery(locationsQuery);
+  const updatePlant = useUpdatePlant(id);
   const deletePlant = useDeletePlant();
-  const createLog = useCreateLog(plantId);
   const [editOpen, setEditOpen] = useState(false);
   const [customLogOpen, setCustomLogOpen] = useState(false);
-  const [customType, setCustomType] = useState('');
-  const [customNotes, setCustomNotes] = useState('');
-
-  if (isLoading || !plant) {
-    return (
-      <div className="mx-auto flex max-w-4xl flex-col gap-6">
-        <div className="card overflow-hidden">
-          <Skeleton className="h-40 w-full rounded-none" />
-          <div className="flex flex-col gap-3 p-5">
-            <Skeleton className="h-7 w-1/3" />
-            <Skeleton className="h-4 w-1/2" />
-            <Skeleton className="h-10 w-2/3" />
-          </div>
-        </div>
-        <CardSkeleton lines={3} />
-      </div>
-    );
-  }
 
   const locationName = locations.find((location) => location.id === plant.location_id)?.name;
+  const species = speciesLine(plant);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-6">
@@ -690,12 +102,7 @@ export function PlantDetailPage() {
           <div className="flex items-start justify-between">
             <div>
               <h1 className="text-2xl font-bold">{plant.name}</h1>
-              {(() => {
-                const speciesLabel = plant.species?.name ?? plant.species_name;
-                const scientific = plant.species?.scientific_name ?? plant.scientific_name;
-                const line = [speciesLabel, scientific].filter(Boolean).join(' · ');
-                return line ? <p className="italic text-stone-500">{line}</p> : null;
-              })()}
+              {species && <p className="italic text-stone-500">{species}</p>}
               <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-stone-500">
                 {locationName && (
                   <span className="flex items-center gap-1">
@@ -719,6 +126,7 @@ export function PlantDetailPage() {
               <button
                 type="button"
                 className="btn-danger"
+                aria-label={`Delete ${plant.name}`}
                 onClick={() => {
                   if (window.confirm(`Delete ${plant.name} including photos, logs and reminders?`)) {
                     deletePlant.mutate(plant.id, {
@@ -752,48 +160,12 @@ export function PlantDetailPage() {
           initial={plant}
           submitLabel="Save changes"
           busy={updatePlant.isPending}
-          onSubmit={(payload) => {
-            updatePlant.mutate(payload, { onSuccess: () => setEditOpen(false) });
-          }}
+          onSubmit={(payload) => updatePlant.mutate(payload, { onSuccess: () => setEditOpen(false) })}
         />
       </Modal>
 
       <Modal title="Log custom care event" open={customLogOpen} onClose={() => setCustomLogOpen(false)}>
-        <form
-          className="flex flex-col gap-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (!customType.trim()) return;
-            createLog.mutate(
-              { event_type: customType.trim(), notes: customNotes || null },
-              {
-                onSuccess: () => {
-                  notify(`${customType} logged`);
-                  setCustomLogOpen(false);
-                  setCustomType('');
-                  setCustomNotes('');
-                },
-              },
-            );
-          }}
-        >
-          <div>
-            <label className="mb-1 block text-sm font-medium">Event type</label>
-            <input
-              className="input-base"
-              placeholder="misting, pruning, …"
-              value={customType}
-              onChange={(e) => setCustomType(e.target.value)}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-sm font-medium">Notes (optional)</label>
-            <textarea className="input-base" rows={2} value={customNotes} onChange={(e) => setCustomNotes(e.target.value)} />
-          </div>
-          <button type="submit" className="btn-primary self-start" disabled={createLog.isPending}>
-            Log event
-          </button>
-        </form>
+        <CustomLogForm plantId={plant.id} onDone={() => setCustomLogOpen(false)} />
       </Modal>
     </div>
   );

@@ -1,10 +1,9 @@
 import { useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router';
 import { Camera } from 'lucide-react';
 
-import { api } from '../api/client';
+import { uploadPhoto } from '../api/hooks/usePhotos';
 import { useCreatePlant } from '../api/hooks/usePlants';
-import type { PhotoRead } from '../api/types';
 import { PlantForm } from '../components/PlantForm';
 import { useToast } from '../components/Toast';
 
@@ -25,20 +24,26 @@ export function PlantNewPage() {
           onSubmit={(payload) => {
             createPlant.mutate(payload, {
               onSuccess: async (plant) => {
+                // The plant exists from here on, so always move to it: staying on
+                // the form after a failed photo upload invites a duplicate submit.
                 const file = fileInputRef.current?.files?.[0];
+                let photoError: string | null = null;
                 if (file) {
-                  const form = new FormData();
-                  form.append('file', file);
-                  await api<PhotoRead>(`/api/v1/plants/${plant.id}/photos`, { method: 'POST', body: form });
+                  try {
+                    await uploadPhoto(plant.id, file);
+                  } catch (error) {
+                    photoError = error instanceof Error ? error.message : 'upload failed';
+                  }
                 }
-                notify(`${plant.name} created`);
+                if (photoError) notify(`${plant.name} created, but the photo was not saved: ${photoError}`, 'error');
+                else notify(`${plant.name} created`);
                 navigate(`/plants/${plant.id}`);
               },
             });
           }}
         />
         <div className="mt-4 border-t border-stone-100 pt-4">
-          <label className="mb-1 block text-sm font-medium">Photo (optional)</label>
+          <p className="mb-1 block text-sm font-medium">Photo (optional)</p>
           <button type="button" className="btn-secondary" onClick={() => fileInputRef.current?.click()}>
             <Camera className="h-4 w-4" />
             {photoName || 'Choose photo'}
@@ -47,6 +52,7 @@ export function PlantNewPage() {
             ref={fileInputRef}
             type="file"
             accept="image/*"
+            aria-label="Photo"
             className="hidden"
             onChange={(event) => setPhotoName(event.target.files?.[0]?.name ?? '')}
           />

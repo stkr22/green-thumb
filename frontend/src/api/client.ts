@@ -42,7 +42,11 @@ async function parseError(response: Response): Promise<string> {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${BASE}${path}`, { credentials: 'include', ...init });
+  // The backend requires this header on cookie-authenticated writes (CSRF
+  // defence, see auth/dependencies.py); a cross-site page can't add it.
+  const headers = new Headers(init?.headers);
+  headers.set('X-Requested-With', 'greenthumb');
+  const response = await fetch(`${BASE}${path}`, { credentials: 'include', ...init, headers });
   if (response.status === 401) {
     window.location.assign(loginUrl());
     throw new ApiError(401, 'Not authenticated');

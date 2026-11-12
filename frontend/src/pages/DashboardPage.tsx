@@ -1,37 +1,37 @@
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { AlarmClock, AlertTriangle, CalendarClock, Check, Droplets, Leaf, MapPin, Sprout } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
-import { useCreateLogForPlant } from '../api/hooks/useLogs';
+import { useCreateLogForPlant, useCreateLogsForPlants } from '../api/hooks/useLogs';
 import { useSnoozeReminder, useUnsnoozeReminder } from '../api/hooks/useReminders';
 import type { DashboardSummary, ReminderStatus } from '../api/types';
 import { CareEventChip } from '../components/CareEventChip';
-import { CardSkeleton } from '../components/Skeleton';
 import { useToast } from '../components/Toast';
 import { formatDate, formatDaysAgo } from '../lib/dates';
+import { isSnoozed, snoozeDays } from '../lib/reminders';
 
-// Snoozing defers by the current season's pace, so the label has to match.
-function snoozeDays(status: ReminderStatus): number {
-  return status.effective_interval_days ?? status.interval_days;
-}
+// Rows link to the plant via a "stretched" link (its ::after covers the row)
+// and keep their buttons as siblings lifted above it: buttons nested inside a
+// link are invalid HTML and make screen readers announce the row as one link.
+const STRETCHED_LINK = 'font-medium after:absolute after:inset-0 after:rounded-lg after:content-[""]';
 
 function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red' | 'amber' }) {
   const createLog = useCreateLogForPlant();
   const snoozeReminder = useSnoozeReminder();
   const unsnoozeReminder = useUnsnoozeReminder();
   const { notify } = useToast();
-  const snoozed = Boolean(status.snoozed_until && new Date(status.snoozed_until).getTime() > Date.now());
+  const snoozed = isSnoozed(status);
+  const ids = { reminderId: status.reminder_id, plantId: status.plant_id };
 
   return (
-    <Link
-      to={`/plants/${status.plant_id}`}
-      className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-stone-50"
-    >
+    <li className="relative flex items-center justify-between gap-2 rounded-lg px-3 py-2 hover:bg-stone-50">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="font-medium">{status.plant_name}</span>
+        <Link to={`/plants/${status.plant_id}`} className={STRETCHED_LINK}>
+          {status.plant_name}
+        </Link>
         <CareEventChip eventType={status.event_type} />
       </div>
-      <div className="flex shrink-0 items-center gap-2">
+      <div className="relative z-10 flex shrink-0 items-center gap-2">
         <span className={`text-sm ${snoozed ? 'text-stone-400' : accent === 'red' ? 'text-red-600' : 'text-amber-600'}`}>
           {snoozed ? 'snoozed' : status.due_at ? `due ${formatDate(status.due_at)}` : 'never logged'}
         </span>
@@ -41,22 +41,15 @@ function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red'
             title={`Snooze ${status.event_type} for ${snoozeDays(status)} days`}
             className="btn-secondary px-2 py-1"
             disabled={snoozeReminder.isPending}
-            onClick={(event) => {
-              // Rendered inside the row's <Link>: don't navigate, just snooze.
-              event.preventDefault();
-              event.stopPropagation();
-              snoozeReminder.mutate(
-                { reminderId: status.reminder_id, plantId: status.plant_id },
-                {
-                  onSuccess: () =>
-                    notify(`${status.event_type} snoozed for ${snoozeDays(status)} days`, 'success', {
-                      label: 'Undo',
-                      onClick: () =>
-                        unsnoozeReminder.mutate({ reminderId: status.reminder_id, plantId: status.plant_id }),
-                    }),
-                },
-              );
-            }}
+            onClick={() =>
+              snoozeReminder.mutate(ids, {
+                onSuccess: () =>
+                  notify(`${status.event_type} snoozed for ${snoozeDays(status)} days`, 'success', {
+                    label: 'Undo',
+                    onClick: () => unsnoozeReminder.mutate(ids),
+                  }),
+              })
+            }
           >
             <AlarmClock className="h-4 w-4" />
           </button>
@@ -66,45 +59,47 @@ function ReminderRow({ status, accent }: { status: ReminderStatus; accent: 'red'
           title={`Log ${status.event_type} for ${status.plant_name}`}
           className="btn-secondary px-2 py-1"
           disabled={createLog.isPending}
-          onClick={(event) => {
-            // Rendered inside the row's <Link>: don't navigate, just log.
-            event.preventDefault();
-            event.stopPropagation();
+          onClick={() =>
             createLog.mutate(
               { plantId: status.plant_id, event_type: status.event_type },
               { onSuccess: () => notify(`${status.event_type} logged for ${status.plant_name}`) },
-            );
-          }}
+            )
+          }
         >
           <Check className="h-4 w-4" />
           Done
         </button>
       </div>
-    </Link>
+    </li>
   );
 }
 
 function WaterAllButton({ overdue }: { overdue: ReminderStatus[] }) {
-  const createLog = useCreateLogForPlant();
+  const waterAll = useCreateLogsForPlants();
   const { notify } = useToast();
   // One plant can have several overdue reminders; watering is per plant.
-  const plants = [...new Map(overdue.filter((s) => s.event_type === 'watering').map((s) => [s.plant_id, s])).values()];
-  if (plants.length < 2) return null;
+  const plantIds = [...new Set(overdue.filter((s) => s.event_type === 'watering').map((s) => s.plant_id))];
+  if (plantIds.length < 2) return null;
 
   return (
     <button
       type="button"
       className="btn-secondary"
-      disabled={createLog.isPending}
-      onClick={async () => {
-        for (const status of plants) {
-          await createLog.mutateAsync({ plantId: status.plant_id, event_type: 'watering' });
-        }
-        notify(`Watering logged for ${plants.length} plants`);
-      }}
+      disabled={waterAll.isPending}
+      onClick={() =>
+        waterAll.mutate(
+          { plantIds, eventType: 'watering' },
+          {
+            onSuccess: ({ failed, total }) =>
+              failed === 0
+                ? notify(`Watering logged for ${total} plants`)
+                : notify(`Watering logged for ${total - failed} of ${total} plants`, 'error'),
+          },
+        )
+      }
     >
       <Droplets className="h-4 w-4 text-sky-500" />
-      Water all ({plants.length})
+      Water all ({plantIds.length})
     </button>
   );
 }
@@ -133,22 +128,7 @@ function SeasonBanner({ summary }: { summary: DashboardSummary }) {
 }
 
 export function DashboardPage() {
-  const { data, isLoading } = useDashboard();
-
-  if (isLoading || !data) {
-    return (
-      <div className="mx-auto max-w-5xl">
-        <h1 className="mb-6 text-2xl font-bold">Dashboard</h1>
-        <div className="grid gap-6 lg:grid-cols-2">
-          <CardSkeleton lines={3} />
-          <CardSkeleton lines={3} />
-          <div className="lg:col-span-2">
-            <CardSkeleton lines={4} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  const { data } = useDashboard();
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -185,9 +165,11 @@ export function DashboardPage() {
           {data.overdue.length === 0 ? (
             <p className="text-sm text-stone-500">Nothing overdue. Your plants are happy.</p>
           ) : (
-            data.overdue.map((status) => (
-              <ReminderRow key={status.reminder_id} status={status} accent="red" />
-            ))
+            <ul aria-label="Overdue reminders">
+              {data.overdue.map((status) => (
+                <ReminderRow key={status.reminder_id} status={status} accent="red" />
+              ))}
+            </ul>
           )}
         </section>
 
@@ -199,9 +181,11 @@ export function DashboardPage() {
           {data.upcoming.length === 0 ? (
             <p className="text-sm text-stone-500">Nothing due this week.</p>
           ) : (
-            data.upcoming.map((status) => (
-              <ReminderRow key={status.reminder_id} status={status} accent="amber" />
-            ))
+            <ul aria-label="Upcoming reminders">
+              {data.upcoming.map((status) => (
+                <ReminderRow key={status.reminder_id} status={status} accent="amber" />
+              ))}
+            </ul>
           )}
         </section>
 

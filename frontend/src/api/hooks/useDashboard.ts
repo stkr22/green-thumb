@@ -1,11 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useSuspenseQuery } from '@tanstack/react-query';
 
-import { api } from '../client';
-import type { DashboardSummary } from '../types';
+import { dashboardQuery } from '../queries';
 
+// Suspense: only route pages call this, and their loaders await the data.
 export function useDashboard(upcomingDays = 7) {
-  return useQuery({
-    queryKey: ['dashboard', upcomingDays],
-    queryFn: () => api<DashboardSummary>(`/api/v1/dashboard?upcoming_days=${upcomingDays}`),
-  });
+  return useSuspenseQuery(dashboardQuery(upcomingDays));
 }

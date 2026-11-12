@@ -1,6 +1,12 @@
 // Browser-side Web Push helpers. The subscription lifecycle is:
 // permission -> pushManager.subscribe(VAPID key) -> POST to the backend.
 
+export class PushPermissionError extends Error {
+  constructor() {
+    super('Notification permission was not granted');
+  }
+}
+
 export function pushSupported(): boolean {
   return 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;
 }
@@ -17,18 +23,27 @@ export async function getCurrentSubscription(): Promise<PushSubscription | null>
   return registration.pushManager.getSubscription();
 }
 
-/** Ask for permission and subscribe this device; throws on denial. */
-export async function subscribeDevice(vapidPublicKey: string): Promise<PushSubscriptionJSON> {
+/**
+ * Whether the subscription was made with this VAPID key. After a server key
+ * rotation the old subscription can never receive our pushes again.
+ */
+export function usesKey(subscription: PushSubscription, vapidPublicKey: string): boolean {
+  const current = subscription.options.applicationServerKey;
+  if (!current) return false;
+  const expected = urlBase64ToUint8Array(vapidPublicKey);
+  const actual = new Uint8Array(current);
+  return actual.length === expected.length && actual.every((byte, index) => byte === expected[index]);
+}
+
+/** Ask for permission and subscribe this device; throws PushPermissionError on denial. */
+export async function subscribeDevice(vapidPublicKey: string): Promise<PushSubscription> {
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') {
-    throw new Error('Notification permission was not granted');
-  }
+  if (permission !== 'granted') throw new PushPermissionError();
   const registration = await navigator.serviceWorker.ready;
-  const subscription = await registration.pushManager.subscribe({
+  return registration.pushManager.subscribe({
     userVisibleOnly: true,
     applicationServerKey: urlBase64ToUint8Array(vapidPublicKey) as BufferSource,
   });
-  return subscription.toJSON();
 }
 
 /** Unsubscribe locally; returns the endpoint so the backend row can go too. */

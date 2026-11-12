@@ -1,8 +1,11 @@
 @import 'tailwindcss';
 
-/* Shared form control look so every page stays consistent. */
+/* Shared form control look so every page stays consistent.
+   16px on phones: iOS Safari zooms in on focusing any field with smaller text
+   and often stays zoomed after blur, which offsets fixed elements (the bottom
+   nav floated mid-screen until the next scroll). 14px from the sm breakpoint. */
 @utility input-base {
-  @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-sm text-stone-800 placeholder-stone-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500;
+  @apply w-full rounded-lg border border-stone-300 bg-white px-3 py-2 text-base text-stone-800 sm:text-sm placeholder-stone-400 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500;
 }
 
 @utility btn-primary {

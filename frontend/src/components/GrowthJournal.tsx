@@ -2,24 +2,15 @@
 // grouped by month. The data already exists (photo timestamps + care logs);
 // this is purely a different lens on it.
 
-import { useQuery } from '@tanstack/react-query';
 import { BookOpen } from 'lucide-react';
 
-import { api, photoUrl, thumbnailUrl } from '../api/client';
+import { photoUrl, thumbnailUrl } from '../api/client';
+import { useJournalLogs } from '../api/hooks/useLogs';
 import { usePhotos } from '../api/hooks/usePhotos';
+import { JOURNAL_LOG_LIMIT } from '../api/queries';
 import type { CareLogRead, PhotoRead } from '../api/types';
 import { careEventStyle } from '../lib/careEvents';
 import { formatDate } from '../lib/dates';
-
-const JOURNAL_LOG_LIMIT = 500;
-
-// Shares the ['plants', id, 'logs'] prefix, so care-log mutations refresh it.
-function useJournalLogs(plantId: string) {
-  return useQuery({
-    queryKey: ['plants', plantId, 'logs', 'journal'],
-    queryFn: () => api<CareLogRead[]>(`/api/v1/plants/${plantId}/logs?limit=${JOURNAL_LOG_LIMIT}`),
-  });
-}
 
 type Entry =
   | { at: string; kind: 'photo'; photo: PhotoRead }
@@ -27,6 +18,11 @@ type Entry =
 
 function monthLabel(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+}
+
+function EventIcon({ eventType }: { eventType: string }) {
+  const { Icon, icon } = careEventStyle(eventType);
+  return <Icon className={`mt-0.5 h-4 w-4 shrink-0 ${icon}`} />;
 }
 
 export function GrowthJournal({ plantId }: { plantId: string }) {
@@ -64,6 +60,9 @@ export function GrowthJournal({ plantId }: { plantId: string }) {
                       <img
                         src={thumbnailUrl(entry.photo.id)}
                         alt={`Photo from ${formatDate(entry.at)}`}
+                        loading="lazy"
+                        width={80}
+                        height={80}
                         className="h-20 w-20 rounded-lg object-cover transition hover:opacity-90"
                       />
                     </a>
@@ -71,10 +70,7 @@ export function GrowthJournal({ plantId }: { plantId: string }) {
                   </li>
                 ) : (
                   <li key={`log-${entry.log.id}`} className="flex items-start gap-2">
-                    {(() => {
-                      const event = careEventStyle(entry.log.event_type);
-                      return <event.Icon className={`mt-0.5 h-4 w-4 shrink-0 ${event.icon}`} />;
-                    })()}
+                    <EventIcon eventType={entry.log.event_type} />
                     <div className="text-sm">
                       <span className="font-medium capitalize">{entry.log.event_type}</span>
                       <span className="ml-2 text-stone-500">{formatDate(entry.at)}</span>

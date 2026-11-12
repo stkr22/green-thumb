@@ -1,5 +1,4 @@
-import type { MouseEvent } from 'react';
-import { Link } from 'react-router-dom';
+import { Link } from 'react-router';
 import { Droplets, Leaf, MapPin } from 'lucide-react';
 
 import { thumbnailUrl } from '../api/client';
@@ -19,24 +18,31 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
   const createLog = useCreateLog(plant.id);
   const { notify } = useToast();
 
-  // Logged from inside the card's <Link>, so cancel navigation to the detail page.
-  const quickLog = (event: MouseEvent, eventType: string, label: string) => {
-    event.preventDefault();
-    event.stopPropagation();
-    createLog.mutate({ event_type: eventType }, { onSuccess: () => notify(`${label} logged`) });
-  };
-
+  // The title link is "stretched" over the whole card (its ::after covers it),
+  // while the quick-log buttons sit above it as siblings. Buttons nested inside
+  // a link are invalid HTML and made the whole card read as one link.
   return (
-    <Link to={`/plants/${plant.id}`} className="card overflow-hidden transition hover:shadow-md">
+    <article className="card relative overflow-hidden transition hover:shadow-md">
       {plant.cover_photo_id ? (
-        <img src={thumbnailUrl(plant.cover_photo_id)} alt={plant.name} className="h-40 w-full object-cover" />
+        <img
+          src={thumbnailUrl(plant.cover_photo_id)}
+          alt=""
+          loading="lazy"
+          width={400}
+          height={160}
+          className="h-40 w-full object-cover"
+        />
       ) : (
         <div className="flex h-40 w-full items-center justify-center bg-emerald-50">
           <Leaf className="h-10 w-10 text-emerald-300" />
         </div>
       )}
       <div className="p-4">
-        <h3 className="font-semibold">{plant.name}</h3>
+        <h3 className="font-semibold">
+          <Link to={`/plants/${plant.id}`} className="after:absolute after:inset-0 after:content-['']">
+            {plant.name}
+          </Link>
+        </h3>
         {plant.species_display_name && (
           <p className="text-sm italic text-stone-500">{plant.species_display_name}</p>
         )}
@@ -70,7 +76,7 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
             ))}
           </div>
         )}
-        <div className="mt-3 flex gap-2">
+        <div className="relative z-10 mt-3 flex gap-2">
           {['watering', 'fertilising'].map((eventType) => {
             const event = careEventStyle(eventType);
             return (
@@ -78,8 +84,11 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
                 key={eventType}
                 type="button"
                 className="btn-secondary flex-1"
+                aria-label={`${event.verb} ${plant.name}`}
                 disabled={createLog.isPending}
-                onClick={(e) => quickLog(e, eventType, event.verb)}
+                onClick={() =>
+                  createLog.mutate({ event_type: eventType }, { onSuccess: () => notify(`${event.verb} logged`) })
+                }
               >
                 <event.Icon className={`h-4 w-4 ${event.icon}`} />
                 {event.verb}
@@ -88,6 +97,6 @@ export function PlantCard({ plant, locationName }: PlantCardProps) {
           })}
         </div>
       </div>
-    </Link>
+    </article>
   );
 }

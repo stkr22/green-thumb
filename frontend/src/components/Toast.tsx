@@ -2,7 +2,7 @@
 // module-level bridge so the QueryClient (created outside React) can raise
 // toasts without prop drilling.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
+import { createContext, useContext, useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 
@@ -43,12 +43,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
 
-  const notify = useCallback((message: string, kind: ToastKind = 'success', action?: ToastAction) => {
+  const notify = (message: string, kind: ToastKind = 'success', action?: ToastAction) => {
     const id = nextId.current++;
     setToasts((current) => [...current, { id, kind, message, action }]);
     // Toasts with an action (e.g. Undo) stay longer so users can react.
     setTimeout(() => setToasts((current) => current.filter((toast) => toast.id !== id)), action ? 8000 : 5000);
-  }, []);
+  };
 
   useEffect(() => {
     bridge = (message, kind) => notify(message, kind);
@@ -57,15 +57,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     };
   }, [notify]);
 
-  const value = useMemo(() => ({ notify }), [notify]);
+  // Stable across renders thanks to the React Compiler, so consumers don't re-render.
+  const value = { notify };
 
   return (
     <ToastContext.Provider value={value}>
       {children}
-      <div className="fixed right-4 top-4 z-50 flex w-80 flex-col gap-2">
+      {/* A live region so screen readers announce toasts; errors interrupt. */}
+      <div aria-live="polite" className="fixed right-4 top-4 z-50 flex w-80 flex-col gap-2">
         {toasts.map((toast) => (
           <div
             key={toast.id}
+            role={toast.kind === 'error' ? 'alert' : 'status'}
             className={`flex items-start justify-between gap-2 rounded-lg px-4 py-3 text-sm shadow-lg ${
               toast.kind === 'error' ? 'bg-red-600 text-white' : 'bg-emerald-600 text-white'
             }`}

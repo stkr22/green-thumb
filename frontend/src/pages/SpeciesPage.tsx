@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useDeferredValue, useState } from 'react';
+import { useSuspenseQuery } from '@tanstack/react-query';
 import { Pencil, Plus, Search, Sprout, Trash2 } from 'lucide-react';
 
 import { useApplySeasonPlan } from '../api/hooks/useSeasons';
-import { useCreateSpecies, useDeleteSpecies, useSpecies, useUpdateSpecies } from '../api/hooks/useSpecies';
+import { useCreateSpecies, useDeleteSpecies, useUpdateSpecies } from '../api/hooks/useSpecies';
+import { speciesQuery } from '../api/queries';
 import type { SpeciesListItem } from '../api/types';
 import { Modal } from '../components/Modal';
 import { SpeciesForm } from '../components/SpeciesForm';
@@ -38,12 +40,19 @@ function SpeciesRow({ species, onEdit }: { species: SpeciesListItem; onEdit: () 
         {summary && <p className="mt-1 text-xs text-stone-500">{summary}</p>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
-        <button type="button" title="Edit" className="text-stone-400 hover:text-stone-700" onClick={onEdit}>
+        <button
+          type="button"
+          title="Edit"
+          aria-label={`Edit ${species.name}`}
+          className="text-stone-400 hover:text-stone-700"
+          onClick={onEdit}
+        >
           <Pencil className="h-4 w-4" />
         </button>
         <button
           type="button"
           title="Delete"
+          aria-label={`Delete ${species.name}`}
           className="text-stone-400 hover:text-red-600"
           onClick={() => {
             if (
@@ -62,7 +71,11 @@ function SpeciesRow({ species, onEdit }: { species: SpeciesListItem; onEdit: () 
 
 export function SpeciesPage() {
   const [search, setSearch] = useState('');
-  const { data: species = [], isLoading } = useSpecies(search || undefined);
+  // Query on the deferred value: a new search suspends only the deferred
+  // render, so typing stays responsive and the current list stays visible.
+  // The unfiltered list was awaited by the route loader.
+  const deferredSearch = useDeferredValue(search.trim());
+  const { data: species } = useSuspenseQuery(speciesQuery(deferredSearch));
   const createSpecies = useCreateSpecies();
   const updateSpecies = useUpdateSpecies();
   const applySeasonPlan = useApplySeasonPlan();
@@ -83,6 +96,8 @@ export function SpeciesPage() {
       <div className="relative mb-6 max-w-sm">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-stone-400" />
         <input
+          type="search"
+          aria-label="Search species"
           className="input-base pl-9"
           placeholder="Search species…"
           value={search}
@@ -90,16 +105,14 @@ export function SpeciesPage() {
         />
       </div>
 
-      {isLoading ? (
-        <p className="text-stone-500">Loading species…</p>
-      ) : species.length === 0 ? (
+      {species.length === 0 ? (
         <p className="text-stone-500">
           {search
             ? 'No species match your search.'
             : 'No species yet. Add one to share care advice and default reminders across plants of the same kind.'}
         </p>
       ) : (
-        <ul className="card divide-y divide-stone-100">
+        <ul className="card divide-y divide-stone-100" aria-busy={deferredSearch !== search.trim()}>
           {species.map((item) => (
             <SpeciesRow key={item.id} species={item} onEdit={() => setEditing(item)} />
           ))}

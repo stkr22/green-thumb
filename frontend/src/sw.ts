@@ -4,6 +4,7 @@
 
 /// <reference lib="webworker" />
 
+import { clientsClaim } from 'workbox-core';
 import { createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching';
 import { NavigationRoute, registerRoute } from 'workbox-routing';
 
@@ -17,14 +18,23 @@ registerRoute(
   }),
 );
 
-// Take over immediately on update so users aren't stuck on a stale shell.
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') void self.skipWaiting();
-});
+// registerType 'autoUpdate' never messages the worker to skip waiting; it only
+// reloads the page once a new worker activates. So activate and take control
+// right away, otherwise an update waits until every tab and the installed PWA
+// are closed.
+void self.skipWaiting();
+clientsClaim();
 
 // Web Push: the backend sends {title, body} JSON (see services/webpush.py).
 self.addEventListener('push', (event) => {
-  const data = (event.data?.json() ?? {}) as { title?: string; body?: string };
+  let data: { title?: string; body?: string } = {};
+  try {
+    data = event.data?.json() ?? {};
+  } catch {
+    // A non-JSON payload must still show a notification: browsers penalise
+    // push events that end without one.
+    data = { body: event.data?.text() };
+  }
   event.waitUntil(
     self.registration.showNotification(data.title ?? 'Green Thumb', {
       body: data.body ?? '',
@@ -42,7 +52,9 @@ self.addEventListener('notificationclick', (event) => {
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       const open = clients.find((client): client is WindowClient => 'focus' in client);
       // The dashboard lists what's overdue, which is what the digest is about.
-      if (open) return open.navigate('/').then((c) => c?.focus());
+      // navigate() rejects for clients this worker doesn't control yet, so
+      // fall back to opening a fresh window rather than doing nothing.
+      if (open) return open.navigate('/').then((c) => c?.focus(), () => self.clients.openWindow('/'));
       return self.clients.openWindow('/');
     }),
   );

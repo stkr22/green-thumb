@@ -389,7 +389,7 @@ export interface paths {
         put?: never;
         /**
          * Upload Photo
-         * @description Upload a photo (multipart/form-data) and store it as bytea.
+         * @description Upload a photo (multipart/form-data); stored re-encoded as WebP BLOBs.
          */
         post: operations["upload_photo_api_v1_plants__plant_id__photos_post"];
         delete?: never;
@@ -414,7 +414,7 @@ export interface paths {
         post?: never;
         /**
          * Delete Photo
-         * @description Delete a photo, clearing it as cover photo where referenced.
+         * @description Delete a photo; ON DELETE SET NULL clears it as cover photo where referenced.
          */
         delete: operations["delete_photo_api_v1_photos__photo_id__delete"];
         options?: never;
@@ -812,7 +812,7 @@ export interface components {
          */
         LocationUpdate: {
             /** Name */
-            name?: string | null;
+            name?: string;
             /** Description */
             description?: string | null;
         };
@@ -1015,7 +1015,7 @@ export interface components {
          */
         PlantUpdate: {
             /** Name */
-            name?: string | null;
+            name?: string;
             /** Species Name */
             species_name?: string | null;
             /** Scientific Name */
@@ -1027,7 +1027,7 @@ export interface components {
             /** Notes */
             notes?: string | null;
             /** Tags */
-            tags?: string[] | null;
+            tags?: string[];
         };
         /**
          * PushKeys
@@ -1302,20 +1302,20 @@ export interface components {
          */
         ReminderUpdate: {
             /** Event Type */
-            event_type?: string | null;
+            event_type?: string;
             /** Interval Days */
-            interval_days?: number | null;
+            interval_days?: number;
             /** Season Multipliers */
             season_multipliers?: {
                 [key: string]: number | null;
-            } | null;
-            schedule_kind?: components["schemas"]["ScheduleKind"] | null;
+            };
+            schedule_kind?: components["schemas"]["ScheduleKind"];
             /** Window Start Month */
             window_start_month?: number | null;
             /** Window End Month */
             window_end_month?: number | null;
             /** Enabled */
-            enabled?: boolean | null;
+            enabled?: boolean;
         };
         /**
          * ScheduleKind
@@ -1533,7 +1533,7 @@ export interface components {
          */
         SpeciesUpdate: {
             /** Name */
-            name?: string | null;
+            name?: string;
             /** Scientific Name */
             scientific_name?: string | null;
             /** Light */
@@ -1543,7 +1543,7 @@ export interface components {
             /** Soil Hint */
             soil_hint?: string | null;
             /** Deadheading */
-            deadheading?: boolean | null;
+            deadheading?: boolean;
             /** Deadheading Hint */
             deadheading_hint?: string | null;
             /** Toxicity */
@@ -1553,17 +1553,17 @@ export interface components {
             /** Default Intervals */
             default_intervals?: {
                 [key: string]: number;
-            } | null;
+            };
             /** Season Plan */
             season_plan?: {
                 [key: string]: {
                     [key: string]: number | null;
                 };
-            } | null;
+            };
             /** Default Windows */
             default_windows?: {
                 [key: string]: number[];
-            } | null;
+            };
         };
         /**
          * UserRead
@@ -1595,7 +1595,7 @@ export interface components {
          */
         UserUpdate: {
             /** Ntfy Enabled */
-            ntfy_enabled?: boolean | null;
+            ntfy_enabled?: boolean;
             /** Ntfy Topic Override */
             ntfy_topic_override?: string | null;
         };
