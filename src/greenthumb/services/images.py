@@ -15,6 +15,7 @@ side effect of re-encoding, which both shrinks the file and strips embedded GPS.
 """
 
 import io
+import warnings
 
 from PIL import Image, ImageOps, UnidentifiedImageError
 
@@ -29,19 +30,22 @@ THUMBNAIL_QUALITY = 75
 
 OUTPUT_MIME_TYPE = "image/webp"
 
+# Phone photos are ~12-50 MP. Pillow's default ceiling (~89 MP warns, ~179 MP
+# errors) would let a crafted file decode to ~700 MB of RGBA on a small pod.
+_MAX_PIXELS = 64_000_000
+# Only what cameras and browsers produce; keeps exotic decoders off the attack surface.
+_ACCEPTED_FORMATS = ("JPEG", "PNG", "WEBP", "GIF", "AVIF")
+
 
 class UnprocessableImageError(Exception):
     """Raised when the uploaded bytes cannot be decoded as an image."""
 
 
-def _encode(image: Image.Image, max_edge: int, quality: int) -> bytes:
-    """Downscale a copy of ``image`` to ``max_edge`` and encode it as WebP."""
-    # thumbnail() mutates in place and never upscales, so work on a copy to keep
-    # the source intact for the second variant.
-    variant = image.copy()
-    variant.thumbnail((max_edge, max_edge))
+def _encode(image: Image.Image, quality: int) -> bytes:
     buffer = io.BytesIO()
-    variant.save(buffer, format="WEBP", quality=quality, method=6)
+    # method=4 (the default speed/size tradeoff) is several times faster than 6
+    # for a few percent larger files, which matters on a CPU-limited pod.
+    image.save(buffer, format="WEBP", quality=quality, method=4)
     return buffer.getvalue()
 
 
@@ -53,16 +57,34 @@ def process_upload(raw: bytes) -> tuple[bytes, bytes]:
     event loop.
     """
     try:
-        with Image.open(io.BytesIO(raw)) as opened:
-            # Bake in EXIF orientation before re-encoding strips the metadata,
-            # otherwise portrait phone shots would display sideways.
-            image = ImageOps.exif_transpose(opened)
-            # Preserve alpha (PNG uploads) but flatten exotic modes (P, CMYK)
-            # that WebP cannot encode directly.
-            if image.mode not in ("RGB", "RGBA"):
-                image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
-            display = _encode(image, DISPLAY_MAX_EDGE, DISPLAY_QUALITY)
-            thumbnail = _encode(image, THUMBNAIL_MAX_EDGE, THUMBNAIL_QUALITY)
-    except (UnidentifiedImageError, OSError, ValueError) as e:
+        with warnings.catch_warnings():
+            # Promote Pillow's "suspiciously large" warning to an error.
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(io.BytesIO(raw), formats=_ACCEPTED_FORMATS) as opened:
+                if opened.width * opened.height > _MAX_PIXELS:
+                    raise UnprocessableImageError("image has too many pixels")
+                # JPEG can decode at 1/2, 1/4 or 1/8 scale for free; skip
+                # decoding pixels the downscale would throw away anyway.
+                opened.draft("RGB", (DISPLAY_MAX_EDGE, DISPLAY_MAX_EDGE))
+                # Bake in EXIF orientation before re-encoding strips the metadata,
+                # otherwise portrait phone shots would display sideways.
+                image = ImageOps.exif_transpose(opened)
+                # Preserve alpha (PNG uploads) but flatten exotic modes (P, CMYK)
+                # that WebP cannot encode directly.
+                if image.mode not in ("RGB", "RGBA"):
+                    image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
+                # thumbnail() downscales in place and never upscales; deriving the
+                # small variant from the display one avoids a second full-size pass.
+                image.thumbnail((DISPLAY_MAX_EDGE, DISPLAY_MAX_EDGE))
+                display = _encode(image, DISPLAY_QUALITY)
+                image.thumbnail((THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE))
+                thumbnail = _encode(image, THUMBNAIL_QUALITY)
+    except (
+        UnidentifiedImageError,
+        OSError,
+        ValueError,
+        Image.DecompressionBombError,
+        Image.DecompressionBombWarning,
+    ) as e:
         raise UnprocessableImageError(str(e)) from e
     return display, thumbnail

@@ -4,19 +4,21 @@
 // only appear for plants without a species link.
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus } from 'lucide-react';
-import { z } from 'zod';
+// zod/mini: same validation, tree-shakable functional API, much smaller bundle.
+import { z } from 'zod/mini';
 
 import { useLocations } from '../api/hooks/useLocations';
 import { useCreateSpecies, useSpecies } from '../api/hooks/useSpecies';
 import type { PlantCreate, PlantDetail } from '../api/types';
+import { Field } from './Field';
 import { Modal } from './Modal';
 import { SpeciesForm } from './SpeciesForm';
 
 const plantFormSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(200),
+  name: z.string().check(z.minLength(1, 'Name is required'), z.maxLength(200)),
   species_id: z.string(),
   species_name: z.string(),
   scientific_name: z.string(),
@@ -27,7 +29,7 @@ const plantFormSchema = z.object({
 
 type PlantFormValues = z.infer<typeof plantFormSchema>;
 
-export function toPlantPayload(values: PlantFormValues): PlantCreate {
+function toPlantPayload(values: PlantFormValues): PlantCreate {
   return {
     name: values.name,
     species_id: values.species_id || null,
@@ -66,7 +68,7 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
       tags: initial?.tags.join(', ') ?? '',
     },
   });
-  const speciesId = form.watch('species_id');
+  const speciesId = useWatch({ control: form.control, name: 'species_id' });
 
   return (
     <>
@@ -74,79 +76,72 @@ export function PlantForm({ initial, submitLabel, busy, onSubmit }: PlantFormPro
         className="flex flex-col gap-4"
         onSubmit={form.handleSubmit((values) => onSubmit(toPlantPayload(values)))}
       >
-        <div>
-          <label className="mb-1 block text-sm font-medium">Name</label>
-          <input className="input-base" placeholder="My Monstera" {...form.register('name')} />
-          {form.formState.errors.name && (
-            <p className="mt-1 text-sm text-red-600">{form.formState.errors.name.message}</p>
-          )}
-        </div>
+        <Field label="Name" error={form.formState.errors.name?.message}>
+          {(id) => <input id={id} className="input-base" placeholder="My Monstera" {...form.register('name')} />}
+        </Field>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Species</label>
-          <div className="flex gap-2">
-            <select className="input-base" aria-label="Species" {...form.register('species_id')}>
-              <option value="">No species</option>
-              {speciesList.map((species) => (
-                <option key={species.id} value={species.id}>
-                  {species.name}
-                  {species.scientific_name ? ` (${species.scientific_name})` : ''}
-                </option>
-              ))}
-            </select>
-            <button
-              type="button"
-              className="btn-secondary shrink-0"
-              title="Create a new species"
-              onClick={() => setNewSpeciesOpen(true)}
-            >
-              <Plus className="h-4 w-4" />
-              New
-            </button>
-          </div>
-          {!initial && speciesId && (
-            <p className="mt-1 text-xs text-stone-500">
-              The species&apos; default care reminders are added automatically.
-            </p>
+        <Field
+          label="Species"
+          hint={!initial && speciesId ? "The species' default care reminders are added automatically." : undefined}
+        >
+          {(id) => (
+            <div className="flex gap-2">
+              <select id={id} className="input-base" {...form.register('species_id')}>
+                <option value="">No species</option>
+                {speciesList.map((species) => (
+                  <option key={species.id} value={species.id}>
+                    {species.name}
+                    {species.scientific_name ? ` (${species.scientific_name})` : ''}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                className="btn-secondary shrink-0"
+                title="Create a new species"
+                onClick={() => setNewSpeciesOpen(true)}
+              >
+                <Plus className="h-4 w-4" />
+                New
+              </button>
+            </div>
           )}
-        </div>
+        </Field>
 
         {/* Free-text fallback for plants that aren't worth a species entry. */}
         {!speciesId && (
           <>
-            <div>
-              <label className="mb-1 block text-sm font-medium">Species (free text)</label>
-              <input className="input-base" placeholder="Monstera" {...form.register('species_name')} />
-            </div>
-
-            <div>
-              <label className="mb-1 block text-sm font-medium">Scientific name</label>
-              <input className="input-base" placeholder="Monstera deliciosa" {...form.register('scientific_name')} />
-            </div>
+            <Field label="Species (free text)">
+              {(id) => <input id={id} className="input-base" placeholder="Monstera" {...form.register('species_name')} />}
+            </Field>
+            <Field label="Scientific name">
+              {(id) => (
+                <input id={id} className="input-base" placeholder="Monstera deliciosa" {...form.register('scientific_name')} />
+              )}
+            </Field>
           </>
         )}
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Location</label>
-          <select className="input-base" aria-label="Location" {...form.register('location_id')}>
-            <option value="">No location</option>
-            {locations.map((location) => (
-              <option key={location.id} value={location.id}>
-                {location.name}
-              </option>
-            ))}
-          </select>
-        </div>
+        <Field label="Location">
+          {(id) => (
+            <select id={id} className="input-base" {...form.register('location_id')}>
+              <option value="">No location</option>
+              {locations.map((location) => (
+                <option key={location.id} value={location.id}>
+                  {location.name}
+                </option>
+              ))}
+            </select>
+          )}
+        </Field>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Tags (comma-separated)</label>
-          <input className="input-base" placeholder="tropical, low-light" {...form.register('tags')} />
-        </div>
+        <Field label="Tags (comma-separated)">
+          {(id) => <input id={id} className="input-base" placeholder="tropical, low-light" {...form.register('tags')} />}
+        </Field>
 
-        <div>
-          <label className="mb-1 block text-sm font-medium">Notes</label>
-          <textarea className="input-base" rows={3} {...form.register('notes')} />
-        </div>
+        <Field label="Notes">
+          {(id) => <textarea id={id} className="input-base" rows={3} {...form.register('notes')} />}
+        </Field>
 
         <button type="submit" className="btn-primary self-start" disabled={busy}>
           {submitLabel}

@@ -2,14 +2,14 @@
 // with a horizon wide enough to cover the displayed month; overdue reminders
 // surface on today's cell so they're never invisible.
 
-import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useDeferredValue, useState } from 'react';
+import { Link } from 'react-router';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 import { useDashboard } from '../api/hooks/useDashboard';
 import type { ReminderStatus } from '../api/types';
 import { CareEventChip } from '../components/CareEventChip';
-import { dateKey } from '../lib/dates';
+import { dateKey, formatDateKey, horizonToEndOfMonth } from '../lib/dates';
 
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -27,27 +27,18 @@ export function CalendarPage() {
   const [month, setMonth] = useState(today.getMonth());
   const [selectedKey, setSelectedKey] = useState<string>(dateKey(today));
 
-  // Horizon: from now to the end of the displayed month (clamped to >= 1 day).
-  const horizonDays = useMemo(() => {
-    const endOfMonth = new Date(year, month + 1, 0);
-    const days = Math.ceil((endOfMonth.getTime() - Date.now()) / 86_400_000);
-    return Math.min(366, Math.max(1, days));
-  }, [year, month]);
+  // The current month's horizon is awaited by the route loader. Paging to a
+  // later month needs a longer one: deferring it keeps the current data on
+  // screen while that loads, instead of suspending the whole page.
+  const horizonDays = useDeferredValue(horizonToEndOfMonth(year, month));
   const { data } = useDashboard(horizonDays);
 
-  const byDay = useMemo(() => {
-    const map = new Map<string, ReminderStatus[]>();
-    const push = (key: string, status: ReminderStatus) => {
-      map.set(key, [...(map.get(key) ?? []), status]);
-    };
-    for (const status of data?.upcoming ?? []) {
-      if (status.due_at) push(dateKey(new Date(status.due_at)), status);
-    }
-    for (const status of data?.overdue ?? []) {
-      push(dateKey(new Date()), status);
-    }
-    return map;
-  }, [data]);
+  const byDay = new Map<string, ReminderStatus[]>();
+  const addTo = (key: string, status: ReminderStatus) => byDay.set(key, [...(byDay.get(key) ?? []), status]);
+  for (const status of data.upcoming) {
+    if (status.due_at) addTo(dateKey(new Date(status.due_at)), status);
+  }
+  for (const status of data.overdue) addTo(dateKey(today), status);
 
   const days = monthGrid(year, month);
   const selected = byDay.get(selectedKey) ?? [];
@@ -93,6 +84,8 @@ export function CalendarPage() {
                 key={key}
                 type="button"
                 onClick={() => setSelectedKey(key)}
+                aria-pressed={key === selectedKey}
+                aria-label={`${formatDateKey(key)}${dueCount > 0 ? `, ${dueCount} due` : ''}`}
                 className={`flex h-16 flex-col items-center rounded-lg border p-1 text-sm ${
                   key === selectedKey ? 'border-emerald-500 bg-emerald-50' : 'border-transparent hover:bg-stone-50'
                 } ${inMonth ? 'text-stone-800' : 'text-stone-300'}`}
@@ -110,7 +103,7 @@ export function CalendarPage() {
       </div>
 
       <section className="card mt-6 p-5">
-        <h2 className="mb-3 font-semibold">Due on {selectedKey}</h2>
+        <h2 className="mb-3 font-semibold">Due on {formatDateKey(selectedKey)}</h2>
         {selected.length === 0 ? (
           <p className="text-sm text-stone-500">Nothing due on this day.</p>
         ) : (

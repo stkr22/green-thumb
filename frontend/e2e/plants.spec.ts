@@ -1,70 +1,104 @@
-import { test, expect } from '@playwright/test';
+import { addReminder, createPlant, expect, section, stamp, test, TINY_PNG } from './fixtures';
 
-// Unique suffix per run so tests don't collide with each other or with data
-// left by earlier runs in the shared SQLite file.
-const stamp = () => `${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-
-test('create a location, then a plant in it', async ({ page }) => {
+test('create a location, then a plant in it, and find it by search and tag', async ({ page }) => {
   const id = stamp();
   const locationName = `Greenhouse ${id}`;
   const plantName = `Aloe ${id}`;
 
   await page.goto('/locations');
-  await page.getByPlaceholder('New location').fill(locationName);
-  await page.getByRole('button', { name: 'Add' }).click();
+  await page.getByLabel('New location').fill(locationName);
+  await page.getByRole('button', { name: 'Add location' }).click();
   await expect(page.getByText(locationName)).toBeVisible();
 
-  await page.goto('/plants/new');
-  await page.getByPlaceholder('My Monstera').fill(plantName);
-  await page.getByPlaceholder('tropical, low-light').fill('succulent, easy-care');
-  await page.getByRole('combobox', { name: 'Location' }).selectOption({ label: locationName });
-  await page.getByRole('button', { name: 'Create plant' }).click();
-
-  // Redirected to the new plant's detail page.
-  await expect(page.getByRole('heading', { name: plantName })).toBeVisible();
+  await createPlant(page, plantName, { location: locationName, tags: `succulent, tag-${id}` });
   await expect(page.getByText(locationName)).toBeVisible();
 
-  // And it appears in the plant grid.
   await page.goto('/plants');
-  await expect(page.getByText(plantName)).toBeVisible();
+  await page.getByLabel('Search plants').fill(`Aloe ${id}`);
+  await expect(page.getByRole('link', { name: plantName })).toBeVisible();
+  await expect(page.getByRole('article')).toHaveCount(1);
+
+  // Tag options come from all plants, so they survive the active search.
+  await page.getByLabel('Search plants').fill('');
+  await page.getByLabel('Filter by tag').selectOption(`tag-${id}`);
+  await expect(page.getByRole('article')).toHaveCount(1);
+  await expect(page.getByRole('link', { name: plantName })).toBeVisible();
 });
 
-test('logging watering updates the care summary and timeline', async ({ page }) => {
+test('editing a plant updates its page', async ({ page }) => {
   const id = stamp();
-  const plantName = `Fern ${id}`;
+  await createPlant(page, `Draft ${id}`);
 
-  await page.goto('/plants/new');
-  await page.getByPlaceholder('My Monstera').fill(plantName);
-  await page.getByRole('button', { name: 'Create plant' }).click();
-  await expect(page.getByRole('heading', { name: plantName })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const dialog = page.getByRole('dialog', { name: `Edit Draft ${id}` });
+  await dialog.getByLabel('Name', { exact: true }).fill(`Final ${id}`);
+  await dialog.getByLabel('Notes').fill('Likes the east window');
+  await dialog.getByRole('button', { name: 'Save changes' }).click();
 
-  await page.getByRole('button', { name: 'Water' }).click();
-
-  // Toast confirms the mutation, the summary flips to "today", and a Watering
-  // row is inserted into the care log.
-  await expect(page.getByText('Watered', { exact: true })).toBeVisible();
-  await expect(page.getByText('today')).toBeVisible();
-  // A watering row is inserted into the care log (scope to the list item so we
-  // don't match the event-type filter's <option>).
-  const careLog = page.locator('section', { hasText: 'Care log' });
-  await expect(careLog.locator('li').filter({ hasText: /watering/i })).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByRole('heading', { name: `Final ${id}`, level: 1 })).toBeVisible();
+  await expect(page.getByText('Likes the east window')).toBeVisible();
 });
 
-test('adding a reminder lists it and surfaces it on the dashboard', async ({ page }) => {
-  const id = stamp();
-  const plantName = `Cactus ${id}`;
+test('the edit dialog closes with Escape and discards the draft', async ({ page }) => {
+  const plantName = `Stable ${stamp()}`;
+  await createPlant(page, plantName);
 
+  await page.getByRole('button', { name: 'Edit' }).click();
+  const dialog = page.getByRole('dialog', { name: `Edit ${plantName}` });
+  await dialog.getByLabel('Name', { exact: true }).fill('Not saved');
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+
+  await page.getByRole('button', { name: 'Edit' }).click();
+  await expect(dialog.getByLabel('Name', { exact: true })).toHaveValue(plantName);
+});
+
+test('uploaded photos can become the cover', async ({ page }) => {
+  const plantName = `Photogenic ${stamp()}`;
+  await createPlant(page, plantName);
+
+  const photos = section(page, 'Photos');
+  await photos.getByLabel('Upload photos').setInputFiles({ name: 'leaf.png', mimeType: 'image/png', buffer: TINY_PNG });
+  const setCover = photos.getByRole('button', { name: 'Set as cover photo' });
+  await expect(setCover).toBeVisible();
+
+  await setCover.click();
+  await expect(photos.getByRole('button', { name: 'Current cover photo' })).toBeVisible();
+  await expect(page.getByRole('img', { name: plantName })).toBeVisible();
+});
+
+test('a rejected photo still lands on the created plant instead of inviting a resubmit', async ({ page }) => {
+  const plantName = `Photo ${stamp()}`;
   await page.goto('/plants/new');
-  await page.getByPlaceholder('My Monstera').fill(plantName);
+  await page.getByLabel('Name', { exact: true }).fill(plantName);
+  await page.getByLabel('Photo').setInputFiles({ name: 'broken.png', mimeType: 'image/png', buffer: Buffer.from('not an image') });
   await page.getByRole('button', { name: 'Create plant' }).click();
+
   await expect(page.getByRole('heading', { name: plantName })).toBeVisible();
+  await expect(page.getByText(`${plantName} created, but the photo was not saved`)).toBeVisible();
+});
 
-  // Add a watering reminder (the event field defaults to "watering").
-  await page.getByRole('button', { name: 'Add' }).click();
-  await expect(page.getByText('every 7 days')).toBeVisible();
+test('deleting a plant leaves no trace and raises no errors', async ({ page }) => {
+  const plantName = `Doomed ${stamp()}`;
+  await createPlant(page, plantName);
+  await addReminder(page);
 
-  // A reminder with no matching care log is immediately overdue on the dashboard.
-  await page.goto('/');
-  const overdue = page.locator('section', { hasText: 'Overdue' });
-  await expect(overdue.getByText(plantName)).toBeVisible();
+  // The deleted plant's own queries must not refetch into 404s (each one would
+  // surface as an error toast).
+  const notFound: string[] = [];
+  page.on('response', (response) => {
+    if (response.status() === 404) notFound.push(response.url());
+  });
+  page.once('dialog', (dialog) => void dialog.accept());
+  await page.getByRole('button', { name: `Delete ${plantName}` }).click();
+
+  await expect(page).toHaveURL(/\/plants$/);
+  await expect(page.getByText(`${plantName} deleted`)).toBeVisible();
+  await expect(page.getByRole('link', { name: plantName })).toHaveCount(0);
+  // Its reminder must be gone from the dashboard as well.
+  await page.getByRole('link', { name: 'Dashboard' }).click();
+  await expect(section(page, 'Overdue')).toBeVisible();
+  await expect(page.getByRole('link', { name: plantName })).toHaveCount(0);
+  expect(notFound).toEqual([]);
 });

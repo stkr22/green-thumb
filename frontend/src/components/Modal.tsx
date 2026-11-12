@@ -1,5 +1,9 @@
-import { useEffect, useRef } from 'react';
-import type { KeyboardEvent, ReactNode } from 'react';
+// Native <dialog> opened with showModal(): the browser supplies the focus
+// trap, Escape handling, an inert background and focus restoration on close,
+// which a hand-rolled overlay has to reimplement (and usually gets partly wrong).
+
+import { useEffect, useId, useRef } from 'react';
+import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -9,60 +13,48 @@ interface ModalProps {
   children: ReactNode;
 }
 
-const FOCUSABLE = 'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
-
 export function Modal({ title, open, onClose, children }: ModalProps) {
-  const dialogRef = useRef<HTMLDivElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
-  // Move focus into the dialog so keyboard users aren't left behind it.
   useEffect(() => {
-    if (open) dialogRef.current?.focus();
+    const dialog = dialogRef.current;
+    if (!dialog) return;
+    if (open && !dialog.open) dialog.showModal();
+    if (!open && dialog.open) dialog.close();
   }, [open]);
 
-  if (!open) return null;
-
-  const onKeyDown = (event: KeyboardEvent) => {
-    if (event.key === 'Escape') {
-      event.stopPropagation();
-      onClose();
-      return;
-    }
-    // Minimal focus trap: keep Tab cycling inside the dialog.
-    if (event.key === 'Tab' && dialogRef.current) {
-      const focusable = dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
-      if (focusable.length === 0) return;
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    }
-  };
-
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
-      <div
-        ref={dialogRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        tabIndex={-1}
-        className="card max-h-[90vh] w-full max-w-lg overflow-y-auto p-6 outline-none"
-        onClick={(event) => event.stopPropagation()}
-        onKeyDown={onKeyDown}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">{title}</h2>
-          <button type="button" aria-label="Close" onClick={onClose} className="text-stone-400 hover:text-stone-700">
-            <X className="h-5 w-5" />
-          </button>
+    <dialog
+      ref={dialogRef}
+      aria-labelledby={titleId}
+      className="card m-auto w-[calc(100%-2rem)] max-w-lg p-0 backdrop:bg-black/40"
+      // Escape fires "cancel"; route it through onClose so React state stays
+      // the source of truth for whether the dialog is open.
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      // The inner wrapper fills the dialog, so a click whose target is the
+      // dialog itself can only have landed on the backdrop.
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      {/* Children mount only while open, so forms start fresh each time. */}
+      {open && (
+        <div className="max-h-[90dvh] overflow-y-auto p-6">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 id={titleId} className="text-lg font-semibold">
+              {title}
+            </h2>
+            <button type="button" aria-label="Close" onClick={onClose} className="text-stone-400 hover:text-stone-700">
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+          {children}
         </div>
-        {children}
-      </div>
-    </div>
+      )}
+    </dialog>
   );
 }

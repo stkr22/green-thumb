@@ -1,6 +1,10 @@
+# commit-msg is needed for conventional-pre-commit; `pre-commit install` only
+# installs the pre-commit stage unless told otherwise.
+default_install_hook_types: [pre-commit, commit-msg]
+
 repos:
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.4.0
+    rev: v4.5.0
     hooks:
     - id: conventional-pre-commit
       stages: [commit-msg]
@@ -11,21 +15,30 @@ repos:
     hooks:
       - id: check-merge-conflict
       - id: check-json
+        # devcontainer.json is JSONC: comments are allowed and used there.
+        exclude: ^\.devcontainer/devcontainer\.json$
       - id: check-symlinks
       - id: check-toml
       - id: check-yaml
+        # Helm templates are Go templates, not YAML, until rendered.
+        exclude: ^charts/[^/]+/templates/
       - id: end-of-file-fixer
       - id: trailing-whitespace
 
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
-    hooks:
-      - id: ruff
-        args: [--fix]
-      - id: ruff-format
-
+  # ruff and ty run through `uv run` so hooks use the versions locked in uv.lock,
+  # the same ones CI uses; a separately pinned hook rev drifts from the lockfile.
   - repo: local
     hooks:
+      - id: ruff
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        types_or: [python, pyi]
+      - id: ruff-format
+        name: ruff-format
+        entry: uv run ruff format
+        language: system
+        types_or: [python, pyi]
       - id: ty
         name: ty
         entry: uv run ty check
@@ -41,7 +54,7 @@ repos:
     - id: python-check-blanket-type-ignore
 
   - repo: https://github.com/pypa/pip-audit
-    rev: v2.10.0
+    rev: v2.10.1
     hooks:
       - id: pip-audit
 

@@ -7,15 +7,17 @@
 // paused state, which does not map onto a flat validated text field.
 
 import { useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+// zod/mini: same validation, tree-shakable functional API, much smaller bundle.
+import { z } from 'zod/mini';
 
 import { useSeasonInfo } from '../api/hooks/useSeasons';
 import type { SpeciesCreate, SpeciesRead } from '../api/types';
 import { careEventStyle } from '../lib/careEvents';
+import { Field } from './Field';
+import { MonthWindowPicker } from './MonthWindowPicker';
 import {
-  MONTHS,
   type MonthWindow,
   SEASONAL_EVENT_TYPES,
   SEASONS,
@@ -23,8 +25,8 @@ import {
   WINDOWED_EVENT_TYPES,
   daysToMultiplier,
   isNeutral,
-  monthLabel,
   seasonDays,
+  windowLabel,
 } from '../lib/seasons';
 
 type WindowDraft = Record<string, MonthWindow | undefined>;
@@ -35,8 +37,20 @@ const INTERVAL_FIELDS = [
   { key: 'repotting_days', eventType: 'repotting', label: 'Repotting' },
 ] as const;
 
+/** Base interval per event type with an interval field; 0 means "not set". */
+type BaseDays = Record<(typeof INTERVAL_FIELDS)[number]['eventType'], number>;
+
+// Kept as strings (that's what the inputs hold) but validated, so a typo like
+// "-3" or "1e4" is reported instead of silently dropping the reminder.
+const intervalDays = z.string().check(
+  z.trim(),
+  z.refine((value) => value === '' || (/^\d+$/.test(value) && Number(value) >= 1 && Number(value) <= 3650), {
+    message: 'Enter 1–3650 days, or leave empty',
+  }),
+);
+
 const speciesFormSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(200),
+  name: z.string().check(z.minLength(1, 'Name is required'), z.maxLength(200)),
   scientific_name: z.string(),
   light: z.string(),
   watering_hint: z.string(),
@@ -45,9 +59,9 @@ const speciesFormSchema = z.object({
   deadheading_hint: z.string(),
   toxicity: z.string(),
   common_issues: z.string(),
-  watering_days: z.string(),
-  fertilising_days: z.string(),
-  repotting_days: z.string(),
+  watering_days: intervalDays,
+  fertilising_days: intervalDays,
+  repotting_days: intervalDays,
 });
 
 type SpeciesFormValues = z.infer<typeof speciesFormSchema>;
@@ -62,8 +76,9 @@ function toSpeciesPayload(values: SpeciesFormValues, plan: SeasonPlan, windows: 
   // configured seasonally stores an empty plan rather than a wall of 1.0s.
   const season_plan: SeasonPlan = {};
   for (const eventType of SEASONAL_EVENT_TYPES) {
-    if (default_intervals[eventType] && !isNeutral(plan[eventType])) {
-      season_plan[eventType] = plan[eventType];
+    const multipliers = plan[eventType];
+    if (default_intervals[eventType] && multipliers && !isNeutral(multipliers)) {
+      season_plan[eventType] = multipliers;
     }
   }
   const default_windows: Record<string, number[]> = {};
@@ -101,16 +116,16 @@ function SeasonPlanEditor({
 }: {
   plan: SeasonPlan;
   setPlan: (plan: SeasonPlan) => void;
-  baseDays: Record<string, number>;
+  baseDays: BaseDays;
 }) {
   const { data: seasonInfo } = useSeasonInfo();
   const configurable = SEASONAL_EVENT_TYPES.filter((eventType) => baseDays[eventType] > 0);
 
   function setCell(eventType: string, season: string, multiplier: number | null | undefined) {
-    const next = { ...plan, [eventType]: { ...plan[eventType] } };
-    if (multiplier === undefined) delete next[eventType][season];
-    else next[eventType][season] = multiplier;
-    setPlan(next);
+    const cells = { ...plan[eventType] };
+    if (multiplier === undefined) delete cells[season];
+    else cells[season] = multiplier;
+    setPlan({ ...plan, [eventType]: cells });
   }
 
   if (configurable.length === 0) {
@@ -205,7 +220,7 @@ function WindowEditor({
 }: {
   windows: WindowDraft;
   setWindows: (windows: WindowDraft) => void;
-  baseDays: Record<string, number>;
+  baseDays: BaseDays;
 }) {
   const { data: seasonInfo } = useSeasonInfo();
   const configurable = WINDOWED_EVENT_TYPES.filter((eventType) => baseDays[eventType] > 0);
@@ -223,71 +238,30 @@ function WindowEditor({
                 server supplies the mapping rather than the frontend assuming. */}
             {seasonInfo &&
               SEASONS.map(({ key, label }) => {
-                const months = seasonInfo.season_months[key];
-                if (!months) return null;
+                const [start, end] = seasonInfo.season_months[key] ?? [];
+                if (start === undefined || end === undefined) return null;
                 return (
                   <button
                     key={key}
                     type="button"
                     className="btn-secondary mb-2 px-2 py-1 text-xs"
-                    onClick={() => setWindows({ ...windows, [eventType]: [months[0], months[1]] })}
+                    onClick={() => setWindows({ ...windows, [eventType]: [start, end] })}
                   >
                     {label}
                   </button>
                 );
               })}
-            <div>
-              <label className="mb-1 block text-xs text-stone-500" htmlFor={`${eventType}-window-start`}>
-                From
-              </label>
-              <select
-                id={`${eventType}-window-start`}
-                aria-label={`${style.label} window start`}
-                className="input-base w-28"
-                value={window ? window[0] : ''}
-                onChange={(event) => {
-                  const month = Number.parseInt(event.target.value, 10);
-                  setWindows({
-                    ...windows,
-                    // Default the end month to the start so a half-set window is
-                    // never submitted; the API rejects those outright.
-                    [eventType]: month > 0 ? [month, window?.[1] ?? month] : undefined,
-                  });
-                }}
-              >
-                <option value="">Any time</option>
-                {MONTHS.map((label, index) => (
-                  <option key={label} value={index + 1}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            {window && (
-              <div>
-                <label className="mb-1 block text-xs text-stone-500" htmlFor={`${eventType}-window-end`}>
-                  To
-                </label>
-                <select
-                  id={`${eventType}-window-end`}
-                  aria-label={`${style.label} window end`}
-                  className="input-base w-28"
-                  value={window[1]}
-                  onChange={(event) =>
-                    setWindows({ ...windows, [eventType]: [window[0], Number.parseInt(event.target.value, 10)] })
-                  }
-                >
-                  {MONTHS.map((label, index) => (
-                    <option key={label} value={index + 1}>
-                      {label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
+            <MonthWindowPicker
+              value={window ?? null}
+              onChange={(value) => setWindows({ ...windows, [eventType]: value ?? undefined })}
+              name={`${style.label} window`}
+              startLabel="From"
+              endLabel="To"
+              anyLabel="Any time"
+            />
             {window && (
               <p className="mb-2 text-xs text-stone-500">
-                due dates wait for {monthLabel(window[0])}–{monthLabel(window[1])}
+                due dates wait for {windowLabel(window[0], window[1])}
               </p>
             )}
           </div>
@@ -300,7 +274,8 @@ function WindowEditor({
 function initialWindows(species: SpeciesRead | undefined): WindowDraft {
   const draft: WindowDraft = {};
   for (const [eventType, months] of Object.entries(species?.default_windows ?? {})) {
-    if (months.length === 2) draft[eventType] = [months[0], months[1]];
+    const [start, end] = months;
+    if (months.length === 2 && start !== undefined && end !== undefined) draft[eventType] = [start, end];
   }
   return draft;
 }
@@ -325,49 +300,57 @@ export function SpeciesForm({ initial, submitLabel, busy, onSubmit }: SpeciesFor
       repotting_days: initial?.default_intervals.repotting?.toString() ?? '',
     },
   });
-  const needsDeadheading = form.watch('deadheading');
-  const baseDays: Record<string, number> = {
-    watering: Number.parseInt(form.watch('watering_days'), 10) || 0,
-    fertilising: Number.parseInt(form.watch('fertilising_days'), 10) || 0,
-    repotting: Number.parseInt(form.watch('repotting_days'), 10) || 0,
+  // useWatch subscribes to just these fields; watch() at the top would
+  // re-render the whole form (and both editors) on every keystroke anywhere.
+  const [needsDeadheading, wateringDays, fertilisingDays, repottingDays] = useWatch({
+    control: form.control,
+    name: ['deadheading', 'watering_days', 'fertilising_days', 'repotting_days'],
+  });
+  const baseDays: BaseDays = {
+    watering: Number.parseInt(wateringDays, 10) || 0,
+    fertilising: Number.parseInt(fertilisingDays, 10) || 0,
+    repotting: Number.parseInt(repottingDays, 10) || 0,
   };
+  const errors = form.formState.errors;
 
   return (
     <form
       className="flex flex-col gap-4"
+      // Zod is the one validation path, rendering inline messages; native
+      // min/max bubbles would block submit before it ever ran.
+      noValidate
       onSubmit={form.handleSubmit((values) => onSubmit(toSpeciesPayload(values, plan, windows)))}
     >
-      <div>
-        <label className="mb-1 block text-sm font-medium">Name</label>
-        <input className="input-base" placeholder="Monstera" {...form.register('name')} />
-        {form.formState.errors.name && (
-          <p className="mt-1 text-sm text-red-600">{form.formState.errors.name.message}</p>
+      <Field label="Name" error={errors.name?.message}>
+        {(id) => <input id={id} className="input-base" placeholder="Monstera" {...form.register('name')} />}
+      </Field>
+
+      <Field label="Scientific name">
+        {(id) => (
+          <input id={id} className="input-base" placeholder="Monstera deliciosa" {...form.register('scientific_name')} />
         )}
-      </div>
+      </Field>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Scientific name</label>
-        <input className="input-base" placeholder="Monstera deliciosa" {...form.register('scientific_name')} />
-      </div>
+      <Field label="Light">
+        {(id) => <input id={id} className="input-base" placeholder="Bright indirect" {...form.register('light')} />}
+      </Field>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Light</label>
-        <input className="input-base" placeholder="Bright indirect" {...form.register('light')} />
-      </div>
+      <Field label="Watering advice">
+        {(id) => (
+          <input
+            id={id}
+            className="input-base"
+            placeholder="Let the top few centimetres of soil dry out"
+            {...form.register('watering_hint')}
+          />
+        )}
+      </Field>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Watering advice</label>
-        <input
-          className="input-base"
-          placeholder="Let the top few centimetres of soil dry out"
-          {...form.register('watering_hint')}
-        />
-      </div>
-
-      <div>
-        <label className="mb-1 block text-sm font-medium">Soil & repotting advice</label>
-        <input className="input-base" placeholder="Well-draining aroid mix" {...form.register('soil_hint')} />
-      </div>
+      <Field label="Soil & repotting advice">
+        {(id) => (
+          <input id={id} className="input-base" placeholder="Well-draining aroid mix" {...form.register('soil_hint')} />
+        )}
+      </Field>
 
       <div>
         <label className="flex items-center gap-2 text-sm font-medium">
@@ -377,26 +360,30 @@ export function SpeciesForm({ initial, submitLabel, busy, onSubmit }: SpeciesFor
         {needsDeadheading && (
           <input
             className="input-base mt-2"
+            aria-label="Deadheading advice"
             placeholder="Pinch spent blooms just above the next bud"
             {...form.register('deadheading_hint')}
           />
         )}
       </div>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Toxicity</label>
-        <input className="input-base" placeholder="Toxic to cats and dogs" {...form.register('toxicity')} />
-      </div>
+      <Field label="Toxicity">
+        {(id) => (
+          <input id={id} className="input-base" placeholder="Toxic to cats and dogs" {...form.register('toxicity')} />
+        )}
+      </Field>
 
-      <div>
-        <label className="mb-1 block text-sm font-medium">Common issues</label>
-        <textarea
-          className="input-base"
-          rows={3}
-          placeholder={'Spider mites: fine webbing under leaves\nRoot rot: mushy stems after overwatering'}
-          {...form.register('common_issues')}
-        />
-      </div>
+      <Field label="Common issues">
+        {(id) => (
+          <textarea
+            id={id}
+            className="input-base"
+            rows={3}
+            placeholder={'Spider mites: fine webbing under leaves\nRoot rot: mushy stems after overwatering'}
+            {...form.register('common_issues')}
+          />
+        )}
+      </Field>
 
       <fieldset>
         <legend className="mb-1 text-sm font-medium">Default care plan (every N days)</legend>
@@ -405,17 +392,22 @@ export function SpeciesForm({ initial, submitLabel, busy, onSubmit }: SpeciesFor
         </p>
         <div className="flex flex-wrap gap-3">
           {INTERVAL_FIELDS.map(({ key, label }) => (
-            <div key={key}>
-              <label className="mb-1 block text-xs text-stone-500">{label}</label>
-              <input
-                type="number"
-                min={1}
-                max={3650}
-                aria-label={`${label} interval`}
-                className="input-base w-28"
-                {...form.register(key)}
-              />
-            </div>
+            <Field key={key} label={label} size="sm" error={errors[key]?.message}>
+              {(id) => (
+                <input
+                  id={id}
+                  type="number"
+                  min={1}
+                  max={3650}
+                  // Deliberately "<event> interval": the season cells below are
+                  // named "<event> in <season>", and role-name matching is
+                  // substring-based, so plain "<event>" would match those too.
+                  aria-label={`${label} interval`}
+                  className="input-base w-28"
+                  {...form.register(key)}
+                />
+              )}
+            </Field>
           ))}
         </div>
       </fieldset>

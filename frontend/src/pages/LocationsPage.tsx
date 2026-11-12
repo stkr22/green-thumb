@@ -1,33 +1,52 @@
 import { useState } from 'react';
 import { Check, MapPin, Pencil, Plus, Trash2, X } from 'lucide-react';
 
-import { useCreateLocation, useDeleteLocation, useLocations, useUpdateLocation } from '../api/hooks/useLocations';
+import { useSuspenseQuery } from '@tanstack/react-query';
+
+import { useCreateLocation, useDeleteLocation, useUpdateLocation } from '../api/hooks/useLocations';
+import { locationsQuery } from '../api/queries';
 import type { LocationRead } from '../api/types';
 
-function LocationRow({ location }: { location: LocationRead }) {
+// Mounted only while editing, so every edit starts from the current name and
+// Cancel simply discards the draft (no state to resync with the server value).
+function RenameForm({ location, onDone }: { location: LocationRead; onDone: () => void }) {
   const updateLocation = useUpdateLocation();
+  const [name, setName] = useState(location.name);
+
+  return (
+    <form
+      className="flex flex-1 items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!name.trim()) return;
+        updateLocation.mutate({ id: location.id, name: name.trim() }, { onSuccess: onDone });
+      }}
+    >
+      <input
+        className="input-base max-w-xs"
+        aria-label={`New name for ${location.name}`}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        autoFocus
+      />
+      <button type="submit" title="Save" aria-label="Save" className="text-emerald-600 hover:text-emerald-800">
+        <Check className="h-4 w-4" />
+      </button>
+      <button type="button" title="Cancel" aria-label="Cancel" onClick={onDone} className="text-stone-400">
+        <X className="h-4 w-4" />
+      </button>
+    </form>
+  );
+}
+
+function LocationRow({ location }: { location: LocationRead }) {
   const deleteLocation = useDeleteLocation();
   const [editing, setEditing] = useState(false);
-  const [name, setName] = useState(location.name);
 
   return (
     <li className="flex items-center justify-between px-4 py-3">
       {editing ? (
-        <form
-          className="flex flex-1 items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            updateLocation.mutate({ id: location.id, name }, { onSuccess: () => setEditing(false) });
-          }}
-        >
-          <input className="input-base max-w-xs" value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          <button type="submit" title="Save" className="text-emerald-600 hover:text-emerald-800">
-            <Check className="h-4 w-4" />
-          </button>
-          <button type="button" title="Cancel" onClick={() => setEditing(false)} className="text-stone-400">
-            <X className="h-4 w-4" />
-          </button>
-        </form>
+        <RenameForm location={location} onDone={() => setEditing(false)} />
       ) : (
         <div className="flex items-center gap-3">
           <MapPin className="h-4 w-4 text-emerald-600" />
@@ -42,6 +61,7 @@ function LocationRow({ location }: { location: LocationRead }) {
         <button
           type="button"
           title="Rename"
+          aria-label={`Rename ${location.name}`}
           className="text-stone-400 hover:text-stone-700"
           onClick={() => setEditing(true)}
         >
@@ -50,6 +70,7 @@ function LocationRow({ location }: { location: LocationRead }) {
         <button
           type="button"
           title="Delete"
+          aria-label={`Delete ${location.name}`}
           className="text-stone-400 hover:text-red-600"
           onClick={() => {
             if (
@@ -69,7 +90,8 @@ function LocationRow({ location }: { location: LocationRead }) {
 }
 
 export function LocationsPage() {
-  const { data: locations = [], isLoading } = useLocations();
+  // Awaited by the route loader; errors reach RouteError.
+  const { data: locations } = useSuspenseQuery(locationsQuery);
   const createLocation = useCreateLocation();
   const [name, setName] = useState('');
 
@@ -87,19 +109,18 @@ export function LocationsPage() {
       >
         <input
           className="input-base max-w-sm"
+          aria-label="New location"
           placeholder="New location, e.g. Living room"
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
         <button type="submit" className="btn-primary" disabled={createLocation.isPending}>
           <Plus className="h-4 w-4" />
-          Add
+          Add location
         </button>
       </form>
 
-      {isLoading ? (
-        <p className="text-stone-500">Loading locations…</p>
-      ) : locations.length === 0 ? (
+      {locations.length === 0 ? (
         <p className="text-stone-500">No locations yet. Add rooms or areas where your plants live.</p>
       ) : (
         <ul className="card divide-y divide-stone-100">

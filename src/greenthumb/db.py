@@ -4,7 +4,7 @@ The engine is created lazily so importing the app (e.g. for OpenAPI generation
 or tests) does not require a reachable database.
 
 The app runs on SQLite (aiosqlite). On every connection we enable WAL so the
-hourly reminder loop can write while user requests read, set a busy timeout to
+daily reminder loop can write while user requests read, set a busy timeout to
 absorb the single-writer lock under brief contention, and turn on foreign-key
 enforcement (off by default in SQLite) so ON DELETE cascades fire.
 """

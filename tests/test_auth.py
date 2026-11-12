@@ -11,6 +11,7 @@ from greenthumb.auth.session import (
     verify_flow_token,
     verify_session_token,
 )
+from greenthumb.models import User
 
 
 async def test_me_requires_authentication(anon_client: httpx.AsyncClient):
@@ -53,11 +54,6 @@ async def test_patch_me_updates_ntfy_preferences(client: httpx.AsyncClient):
     assert body["ntfy_topic_override"] == "my-plants"
 
 
-def test_session_token_roundtrip():
-    user_id = uuid.uuid4()
-    assert verify_session_token(create_session_token(user_id)) == user_id
-
-
 def test_flow_token_roundtrip():
     token = create_flow_token("state123", "nonce456", "verifier789")
     assert verify_flow_token(token) == {"state": "state123", "nonce": "nonce456", "code_verifier": "verifier789"}
@@ -66,3 +62,20 @@ def test_flow_token_roundtrip():
 def test_tokens_are_not_interchangeable():
     assert verify_session_token(create_flow_token("s", "n", "v")) is None
     assert verify_flow_token(create_session_token(uuid.uuid4())) is None
+
+
+async def test_cookie_write_without_csrf_header_is_rejected(client: httpx.AsyncClient):
+    # What a forged cross-site request looks like: the cookie rides along, the
+    # custom header can't.
+    del client.headers["X-Requested-With"]
+    response = await client.post("/api/v1/locations", json={"name": "Forged"})
+    assert response.status_code == 403
+    assert (await client.get("/api/v1/locations")).status_code == 200  # reads stay open
+
+
+async def test_bearer_write_needs_no_csrf_header(anon_client: httpx.AsyncClient, user: User):
+    token = create_session_token(user.id)
+    response = await anon_client.post(
+        "/api/v1/locations", json={"name": "Scripted"}, headers={"Authorization": f"Bearer {token}"}
+    )
+    assert response.status_code == 201

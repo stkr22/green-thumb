@@ -3,7 +3,7 @@
 import uuid
 
 from fastapi import APIRouter, HTTPException, status
-from sqlmodel import col, func, select, update
+from sqlmodel import col, func, select
 
 from greenthumb.auth import CurrentUser, SessionDep
 from greenthumb.models import Location, Plant
@@ -60,8 +60,5 @@ async def delete_location(location_id: uuid.UUID, session: SessionDep, _user: Cu
     location = await session.get(Location, location_id)
     if location is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Location not found")
-    # Explicit detach instead of relying on ON DELETE SET NULL so behaviour is
-    # identical on the SQLite test backend.
-    await session.exec(update(Plant).where(col(Plant.location_id) == location_id).values(location_id=None))  # type: ignore[call-overload]
     await session.delete(location)
     await session.commit()

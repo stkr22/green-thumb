@@ -88,33 +88,36 @@ class SpeciesCreate(SQLModel):
 class SpeciesUpdate(SQLModel):
     """Partial update for a species; only provided fields are changed."""
 
-    name: str | None = Field(default=None, min_length=1, max_length=200)
+    # NOT NULL columns are typed non-optional with a None default: omitting the
+    # field leaves it unchanged, while an explicit null is a 422 instead of an
+    # IntegrityError. Nullable columns keep `| None` so null clears them.
+    name: str = Field(default=None, min_length=1, max_length=200)
     scientific_name: str | None = None
     light: str | None = None
     watering_hint: str | None = None
     soil_hint: str | None = None
-    deadheading: bool | None = None
+    deadheading: bool = Field(default=None)
     deadheading_hint: str | None = None
     toxicity: str | None = None
     common_issues: str | None = None
-    default_intervals: dict[str, int] | None = None
-    season_plan: SeasonPlanField | None = None
-    default_windows: DefaultWindowsField | None = None
+    default_intervals: dict[str, int] = Field(default=None)
+    season_plan: SeasonPlanField = Field(default=None)
+    default_windows: DefaultWindowsField = Field(default=None)
 
     @field_validator("default_intervals")
     @classmethod
-    def _validate_intervals(cls, value: dict[str, int] | None) -> dict[str, int] | None:
-        return value if value is None else _check_intervals(value)
+    def _validate_intervals(cls, value: dict[str, int]) -> dict[str, int]:
+        return _check_intervals(value)
 
     @field_validator("season_plan")
     @classmethod
-    def _validate_season_plan(cls, value: SeasonPlanField | None) -> SeasonPlanField | None:
-        return value if value is None else _check_season_plan(value)
+    def _validate_season_plan(cls, value: SeasonPlanField) -> SeasonPlanField:
+        return _check_season_plan(value)
 
     @field_validator("default_windows")
     @classmethod
-    def _validate_windows(cls, value: DefaultWindowsField | None) -> DefaultWindowsField | None:
-        return value if value is None else _check_windows(value)
+    def _validate_windows(cls, value: DefaultWindowsField) -> DefaultWindowsField:
+        return _check_windows(value)
 
 
 class SpeciesRead(SQLModel):

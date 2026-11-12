@@ -10,10 +10,10 @@ tasks see [development.md](development.md); for operating it see
 | --- | --- | --- |
 | Backend API | FastAPI + SQLModel (async, aiosqlite), Python 3.14 | `src/greenthumb/` |
 | Migrations | Alembic | `alembic/` |
-| Frontend | React 19 + TypeScript + Vite + Tailwind CSS 4 + TanStack Query 5 | `frontend/` |
+| Frontend | React 19 (React Compiler) + TypeScript + Vite + Tailwind CSS 4 + TanStack Query 5 + React Router 8 (data router, lazy routes) + React Hook Form + zod/mini | `frontend/` |
 | Database | SQLite (single file) | PVC in production |
 | Deployment | Helm chart (OCI), synced by ArgoCD | `charts/green-thumb/` |
-| Local dev | docker-compose (backend + frontend) | `docker-compose.yml` |
+| Local dev | uv-run backend + Vite dev server proxying `/api` and `/auth` | `frontend/vite.config.ts` |
 
 The SPA and API share one origin in production: the FastAPI backend serves the
 built SPA at `/` alongside the API (via `app.frontend()`), so there is no CORS
@@ -35,7 +35,7 @@ returns a real `404` instead of an HTML page.
 
 ## Why SQLite / single-instance
 
-The app is single-household and single-instance by design: the hourly reminder
+The app is single-household and single-instance by design: the daily reminder
 loop runs **in-process** (a FastAPI lifespan task), so running more than one
 replica would double-send notifications. At that scale SQLite removes the
 operational weight of a separate database (no operator, one file to back up)
@@ -53,7 +53,7 @@ process and the database to a networked store.
 - `db.py` — lazy async engine + request-scoped session dependency. Sets SQLite
   `foreign_keys`, `journal_mode=WAL`, and `busy_timeout` pragmas on connect.
 - `models/` — SQLModel table models. Tag lists and free-form dicts are `JSON`
-  columns; datetimes are normalised with `models.base.ensure_utc`.
+  columns; timestamps use `models.base.UTCDateTime`, so reads are UTC-aware.
 - `schemas/` — Pydantic/SQLModel request & response models.
 - `auth/` — OIDC client, signed-cookie sessions, and the `get_current_user`
   dependency.
@@ -70,6 +70,14 @@ Route handlers are intentionally thin; anything non-trivial lives in `services/`
 The backend implements the full OIDC authorization-code flow with PKCE itself
 (no auth sidecar). Sessions are **stateless signed cookies** — an HS256 JWT
 signed with `SESSION_SECRET_KEY` — so there is no server-side session store.
+
+**CSRF:** cookie-authenticated `POST`/`PUT`/`PATCH`/`DELETE` requests must carry
+an `X-Requested-With` header (any value), or they get `403`. The SPA's fetch
+wrapper always sends it. `SameSite=Lax` already blocks cross-site form posts;
+the header also covers sibling subdomains and body-less or multipart writes,
+because a browser only adds a custom header to a credentialed cross-origin
+request after a CORS preflight, which the backend never approves. Bearer-token
+requests are exempt.
 
 1. `GET /auth/login` — generates `state`, `nonce`, and a PKCE verifier, stores
    them in a short-lived signed **flow cookie**, and redirects to Zitadel's
@@ -96,7 +104,7 @@ local-only `GET /auth/dev-login` bypass gated by `DEV_AUTH_BYPASS`
 ## Reminder evaluation
 
 A background task (`reminder_evaluator.evaluate_and_notify`) runs every
-`REMINDER_CHECK_INTERVAL_SECONDS` (default hourly). For each **enabled**
+`REMINDER_CHECK_INTERVAL_SECONDS` (default daily). For each **enabled**
 reminder it finds the most recent matching care log and computes due state:
 
 - **Overdue** when there is no matching care log, or `now - last_logged_at >

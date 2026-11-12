@@ -12,8 +12,6 @@ export const SEASONS = [
   { key: 'winter', label: 'Winter' },
 ] as const;
 
-export type SeasonKey = (typeof SEASONS)[number]['key'];
-
 /** season -> multiplier on the base interval; null pauses that season. */
 export type SeasonMultipliers = Record<string, number | null>;
 export type SeasonPlan = Record<string, SeasonMultipliers>;
@@ -51,10 +49,6 @@ export function monthLabel(month: number): string {
 /** "Mar–May", or "Nov–Feb" for a window that wraps the year. */
 export function windowLabel(start: number, end: number): string {
   return `${monthLabel(start)}–${monthLabel(end)}`;
-}
-
-export function seasonLabel(season: string): string {
-  return SEASONS.find((entry) => entry.key === season)?.label ?? season;
 }
 
 /** "winter pace" — appended to an interval so a changed schedule explains itself. */

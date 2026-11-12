@@ -1,7 +1,7 @@
 # Setup & Deployment
 
-How to run Green Thumb — locally for development, via docker-compose, and in
-production on Kubernetes. For configuration values and external services
+How to run Green Thumb — locally for development, and in production on
+Kubernetes. For configuration values and external services
 (Zitadel, ntfy), see [administration.md](administration.md).
 
 ## Prerequisites
@@ -10,8 +10,8 @@ production on Kubernetes. For configuration values and external services
 | --- | --- |
 | [uv](https://docs.astral.sh/uv/) | Python dependency management & running the backend |
 | Python 3.14 | Backend runtime (uv can install it) |
-| Node.js 20+ and npm | Frontend build & dev server |
-| Docker / Podman | Building images; docker-compose for local full stack |
+| Node.js 22.22+ and npm | Frontend build & dev server (React Router 8's minimum) |
+| Docker / Podman | Building the container image (optional for local dev) |
 | A Zitadel instance | OIDC login (see [administration.md](administration.md#zitadel-oidc-setup)) |
 | An ntfy server | Push notifications (optional) |
 
@@ -25,14 +25,18 @@ The backend and frontend run as two processes. The Vite dev server proxies
 
 ```bash
 uv sync --group dev                       # install dependencies
+cp .env.example .env                      # gitignored; set SESSION_SECRET_KEY at least
 uv run alembic upgrade head               # create / migrate the SQLite database
 uv run uvicorn greenthumb.main:app --reload
 ```
 
-The backend reads configuration from the environment (and a `.env` file if
-present). At minimum it needs `SESSION_SECRET_KEY`, and the `OIDC_*` values for
-real login. For a quick local run without Zitadel, see the **dev-login bypass**
-in [administration.md](administration.md#dev-login-bypass-local-only).
+The backend (and alembic, which loads the same settings) reads configuration
+from the environment and from a `.env` file in its working directory (the repo
+root); real environment variables win. At minimum it needs `SESSION_SECRET_KEY` (32+ characters), plus the `OIDC_*`
+values for real login. For a quick local run without Zitadel, leave
+`OIDC_ISSUER_URL` empty and use the **dev-login bypass**
+(`DEV_AUTH_BYPASS=true`, then open `http://localhost:5173/auth/dev-login`); see
+[administration.md](administration.md#dev-login-bypass-local-only).
 
 By default the database is a `greenthumb.db` file in the working directory
 (`DATABASE_URL=sqlite+aiosqlite:///./greenthumb.db`).
@@ -47,22 +51,8 @@ npm run dev        # http://localhost:5173, proxies /api and /auth to :8000
 
 Set `DEV_BACKEND_URL` if your backend isn't on `http://localhost:8000`.
 
-### Full stack with docker-compose
-
-`docker-compose.yml` runs the backend (with an embedded SQLite volume) and the
-frontend dev server together:
-
-```bash
-cp .env.local.example .env.local     # fill in OIDC (and optionally ntfy) values
-docker compose up --build
-```
-
 - Frontend: <http://localhost:5173>
 - Backend API docs: <http://localhost:8000/docs>
-
-`.env.local` is gitignored and supplies the secrets; the fixed local values
-(redirect URI, cookie settings) are set in `docker-compose.yml`. See
-[administration.md](administration.md#configuration-reference) for every variable.
 
 ## Production: Kubernetes + ArgoCD
 
@@ -85,8 +75,8 @@ must not run in parallel — see
 
 The namespace and the `green-thumb-backend` secret are **not** part of the chart:
 the namespace is created by the install (`--create-namespace` /
-`CreateNamespace=true`), and the secret is managed out-of-band (see below).
-`k8s/backend/secret.example.yaml` (the secret template) is kept for reference.
+`CreateNamespace=true`), and the secret is managed out-of-band (see the
+`kubectl create secret` command below for its keys).
 The ArgoCD `Application` is **not** in this repo — it lives in the GitOps repo
 that owns the cluster's ArgoCD applications. See `charts/green-thumb/README.md`
 for the full values reference.

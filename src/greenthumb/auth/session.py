@@ -39,10 +39,7 @@ API_TOKEN_MAX_AGE_SECONDS = 60 * 60 * 24 * 90
 @lru_cache(maxsize=1)
 def _signing_key() -> OctKey:
     """Return the symmetric signing key derived from SESSION_SECRET_KEY."""
-    secret = get_settings().SESSION_SECRET_KEY
-    if not secret:
-        raise RuntimeError("SESSION_SECRET_KEY is not configured")
-    return OctKey.import_key(secret)
+    return OctKey.import_key(get_settings().SESSION_SECRET_KEY.get_secret_value())
 
 
 def _encode(claims: dict[str, Any], max_age_seconds: int) -> str:

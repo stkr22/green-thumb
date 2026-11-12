@@ -27,7 +27,11 @@ def call(method: str, path: str, body: dict | None = None) -> Any:
     """Make one authenticated API call, returning the decoded body (None for 204)."""
     data = json.dumps(body).encode() if body is not None else None
     request = urllib.request.Request(
-        BASE + path, data=data, method=method, headers={"Content-Type": "application/json"}
+        BASE + path,
+        data=data,
+        method=method,
+        # X-Requested-With: the backend's CSRF check for cookie-authenticated writes.
+        headers={"Content-Type": "application/json", "X-Requested-With": "greenthumb"},
     )
     with _opener.open(request) as response:
         raw = response.read()

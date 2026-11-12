@@ -15,7 +15,7 @@ from sqlmodel.ext.asyncio.session import AsyncSession
 
 from greenthumb.config import get_settings
 from greenthumb.models import CareLog, Plant, PushSubscription, Reminder, ScheduleKind, User
-from greenthumb.models.base import ensure_utc, utcnow
+from greenthumb.models.base import utcnow
 from greenthumb.schemas import ReminderStatus
 from greenthumb.services import ntfy, seasons, webpush
 from greenthumb.services.seasons import Hemisphere, SeasonMultipliers
@@ -68,7 +68,7 @@ def compute_schedule(
     hemisphere = hemisphere or get_settings().HEMISPHERE
     interval_days = reminder.interval_days
     multipliers: SeasonMultipliers = reminder.season_multipliers
-    snoozed_until = ensure_utc(reminder.snoozed_until) if reminder.snoozed_until is not None else None
+    snoozed_until = reminder.snoozed_until
 
     season = seasons.season_for(now, hemisphere)
 
@@ -146,19 +146,17 @@ def _status_for(
     evaluation pass is judged against the same instant - otherwise a pass that
     straddles midnight on 1 March could price two reminders in two seasons.
     """
-    last_event_at = ensure_utc(last_at) if last_at is not None else None
-    snoozed_until = ensure_utc(reminder.snoozed_until) if reminder.snoozed_until is not None else None
-    schedule = compute_schedule(reminder, last_event_at, now, hemisphere)
+    schedule = compute_schedule(reminder, last_at, now, hemisphere)
     return ReminderStatus(
         reminder_id=reminder.id,
         plant_id=reminder.plant_id,
         plant_name=plant_name,
         event_type=reminder.event_type,
         interval_days=reminder.interval_days,
-        last_event_at=last_event_at,
+        last_event_at=last_at,
         due_at=schedule.due_at,
         overdue=schedule.overdue,
-        snoozed_until=snoozed_until,
+        snoozed_until=reminder.snoozed_until,
         season=schedule.season,
         paused=schedule.paused,
         effective_interval_days=schedule.effective_interval_days,
@@ -195,21 +193,21 @@ async def due_event_types(session: AsyncSession, plant_ids: Iterable[uuid.UUID])
     return due
 
 
-def _digest_line(status: ReminderStatus) -> str:
+def _digest_line(status: ReminderStatus, now: datetime) -> str:
     """One bullet line describing an overdue reminder in the digest."""
     verb = _EVENT_VERBS.get(status.event_type)
     action = f"{verb.capitalize()} {status.plant_name}" if verb else f"{status.plant_name}: {status.event_type}"
     if status.last_event_at:
-        days_ago = (utcnow() - status.last_event_at).days
+        days_ago = (now - status.last_event_at).days
         return f"- {action} (last {status.event_type} {days_ago} days ago)"
     return f"- {action} (no {status.event_type} recorded yet)"
 
 
-def _build_digest(statuses: list[ReminderStatus]) -> tuple[str, str]:
+def _build_digest(statuses: list[ReminderStatus], now: datetime) -> tuple[str, str]:
     """Title/body for a single notification summarising all overdue reminders."""
     n = len(statuses)
     title = f"🌱 {n} plant care reminder{'s' if n != 1 else ''}"
-    return title, "\n".join(_digest_line(s) for s in statuses)
+    return title, "\n".join(_digest_line(s, now) for s in statuses)
 
 
 async def evaluate_and_notify(session: AsyncSession) -> int:
@@ -221,10 +219,14 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
     reminder doesn't reappear in every digest. The digest goes out over both
     channels a user may have: ntfy (opt-in flag) and Web Push (per device).
     """
-    now, hemisphere = utcnow(), get_settings().HEMISPHERE
-    ntfy_recipients = list((await session.exec(select(User).where(col(User.ntfy_enabled).is_(True)))).all())
+    settings = get_settings()
+    now, hemisphere = utcnow(), settings.HEMISPHERE
+    ntfy_users = (await session.exec(select(User).where(col(User.ntfy_enabled).is_(True)))).all()
+    # Users without an override share NTFY_TOPIC; publish each topic once so a
+    # household doesn't receive the same digest once per member.
+    ntfy_topics = {user.ntfy_topic_override or settings.NTFY_TOPIC for user in ntfy_users}
     push_subscriptions = list((await session.exec(select(PushSubscription))).all())
-    if not ntfy_recipients and not push_subscriptions:
+    if not ntfy_topics and not push_subscriptions:
         return 0
 
     due: list[tuple[Reminder, ReminderStatus]] = []
@@ -236,7 +238,7 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
             # Back off at the season's pace, not the growing-season one, so a
             # winter reminder does not reappear twice as often as it is due.
             pace = status.effective_interval_days or reminder.interval_days
-            renotify_after = ensure_utc(reminder.last_notified_at) + timedelta(days=pace / 2)
+            renotify_after = reminder.last_notified_at + timedelta(days=pace / 2)
             if now < renotify_after:
                 continue
         due.append((reminder, status))
@@ -244,10 +246,10 @@ async def evaluate_and_notify(session: AsyncSession) -> int:
     if not due:
         return 0
 
-    title, message = _build_digest([status for _, status in due])
+    title, message = _build_digest([status for _, status in due], now)
     sent = 0
-    for user in ntfy_recipients:
-        sent += int(await ntfy.send_notification(title=title, message=message, topic=user.ntfy_topic_override))
+    for topic in sorted(ntfy_topics):
+        sent += int(await ntfy.send_notification(title=title, message=message, topic=topic))
     for subscription in push_subscriptions:
         result = await webpush.send_notification(subscription, title=title, message=message)
         if result is webpush.PushResult.GONE:
@@ -276,20 +278,12 @@ def split_due(
     return overdue, upcoming
 
 
-async def overdue_and_upcoming(
-    session: AsyncSession, *, upcoming_days: int = 7
-) -> tuple[list[ReminderStatus], list[ReminderStatus]]:
-    """Compute every enabled reminder's status and split it for the dashboard."""
-    return split_due(await compute_reminder_statuses(session), upcoming_days=upcoming_days)
-
-
 __all__ = [
     "Schedule",
     "compute_reminder_statuses",
     "compute_schedule",
     "due_event_types",
     "evaluate_and_notify",
-    "overdue_and_upcoming",
     "split_due",
     "window_months",
 ]

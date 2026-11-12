@@ -168,7 +168,7 @@ async def test_snooze_defers_by_the_seasonal_pace(client: httpx.AsyncClient, pla
     ).json()
     snoozed = (await client.post(f"/api/v1/reminders/{reminder['id']}/snooze", json={})).json()
     # SQLite hands timestamps back naive; compare in naive UTC as the API serves them.
-    deferred_by = datetime.fromisoformat(snoozed["snoozed_until"]) - datetime.now(UTC).replace(tzinfo=None)
+    deferred_by = datetime.fromisoformat(snoozed["snoozed_until"]) - datetime.now(UTC)
     assert timedelta(days=13) < deferred_by <= timedelta(days=14)
 
 

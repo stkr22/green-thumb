@@ -1,22 +1,60 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Bell, BellRing, Copy, Key, Send, Smartphone } from 'lucide-react';
 
 import { useMe, useMintApiToken, useTestNotification, useUpdateMe } from '../api/hooks/useProfile';
-import { usePushPublicKey, useSubscribePush, useUnsubscribePush } from '../api/hooks/usePush';
+import { useDevicePush, usePushPublicKey, useSubscribePush, useUnsubscribePush } from '../api/hooks/usePush';
+import type { UserRead } from '../api/types';
+import { Field } from '../components/Field';
 import { useToast } from '../components/Toast';
-import { getCurrentSubscription, pushSupported } from '../lib/push';
+import { PushPermissionError, pushSupported } from '../lib/push';
+
+function DevicePushToggle({ vapidKey }: { vapidKey: string }) {
+  const { data: subscribed, isPending } = useDevicePush(vapidKey);
+  const subscribePush = useSubscribePush(vapidKey);
+  const unsubscribePush = useUnsubscribePush(vapidKey);
+  const { notify } = useToast();
+
+  if (isPending) return null;
+  if (subscribed) {
+    return (
+      <button
+        type="button"
+        className="btn-secondary"
+        disabled={unsubscribePush.isPending}
+        onClick={() =>
+          unsubscribePush.mutate(undefined, { onSuccess: () => notify('Push notifications disabled on this device') })
+        }
+      >
+        Disable on this device
+      </button>
+    );
+  }
+  return (
+    <button
+      type="button"
+      className="btn-primary"
+      disabled={subscribePush.isPending}
+      onClick={() =>
+        subscribePush.mutate(undefined, {
+          onSuccess: () => notify('Push notifications enabled on this device'),
+          onError: (error) =>
+            notify(
+              error instanceof PushPermissionError
+                ? 'Could not enable push: notification permission was denied'
+                : `Could not enable push: ${error.message}`,
+              'error',
+            ),
+        })
+      }
+    >
+      <BellRing className="h-4 w-4" />
+      Enable on this device
+    </button>
+  );
+}
 
 function DevicePushSection() {
   const { data: publicKey } = usePushPublicKey();
-  const subscribePush = useSubscribePush();
-  const unsubscribePush = useUnsubscribePush();
-  const { notify } = useToast();
-  const [subscribed, setSubscribed] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    void getCurrentSubscription().then((subscription) => setSubscribed(subscription !== null));
-  }, []);
-
   // Server has no VAPID key or the browser can't do push: nothing to offer.
   if (!publicKey?.key || !pushSupported()) return null;
 
@@ -30,42 +68,46 @@ function DevicePushSection() {
         Native notifications without ntfy, straight to this browser or installed app. On iPhone, add the
         app to your home screen first.
       </p>
-      {subscribed === null ? null : subscribed ? (
-        <button
-          type="button"
-          className="btn-secondary"
-          disabled={unsubscribePush.isPending}
-          onClick={() =>
-            unsubscribePush.mutate(undefined, {
-              onSuccess: () => {
-                setSubscribed(false);
-                notify('Push notifications disabled on this device');
-              },
-            })
-          }
-        >
-          Disable on this device
-        </button>
-      ) : (
-        <button
-          type="button"
-          className="btn-primary"
-          disabled={subscribePush.isPending}
-          onClick={() =>
-            subscribePush.mutate(publicKey.key!, {
-              onSuccess: () => {
-                setSubscribed(true);
-                notify('Push notifications enabled on this device');
-              },
-              onError: () => notify('Could not enable push — notification permission was denied'),
-            })
-          }
-        >
-          <BellRing className="h-4 w-4" />
-          Enable on this device
-        </button>
-      )}
+      <DevicePushToggle vapidKey={publicKey.key} />
     </div>
+  );
+}
+
+// Keyed on the saved value by the parent, so it re-initialises when the server
+// value changes instead of copying it into state with an effect.
+function TopicOverrideForm({ me }: { me: UserRead }) {
+  const updateMe = useUpdateMe();
+  const { notify } = useToast();
+  const [topicOverride, setTopicOverride] = useState(me.ntfy_topic_override ?? '');
+
+  return (
+    <form
+      className="mb-4"
+      onSubmit={(event) => {
+        event.preventDefault();
+        updateMe.mutate(
+          { ntfy_topic_override: topicOverride.trim() || null },
+          { onSuccess: () => notify('Notification settings saved') },
+        );
+      }}
+    >
+      <Field label="ntfy topic override">
+        {(id) => (
+          <div className="flex gap-2">
+            <input
+              id={id}
+              className="input-base max-w-xs"
+              placeholder="Default topic when empty"
+              value={topicOverride}
+              onChange={(event) => setTopicOverride(event.target.value)}
+            />
+            <button type="submit" className="btn-secondary" disabled={updateMe.isPending}>
+              Save
+            </button>
+          </div>
+        )}
+      </Field>
+    </form>
   );
 }
 
@@ -75,16 +117,10 @@ export function ProfilePage() {
   const testNotification = useTestNotification();
   const mintApiToken = useMintApiToken();
   const { notify } = useToast();
-  const [topicOverride, setTopicOverride] = useState('');
   const [apiToken, setApiToken] = useState('');
 
-  useEffect(() => {
-    setTopicOverride(me?.ntfy_topic_override ?? '');
-  }, [me?.ntfy_topic_override]);
-
-  if (!me) {
-    return <p className="text-stone-500">Loading profile…</p>;
-  }
+  // App only renders routes once the session probe (the same query) succeeded.
+  if (!me) return null;
 
   return (
     <div className="mx-auto max-w-xl">
@@ -121,29 +157,7 @@ export function ProfilePage() {
           Send me ntfy push notifications for overdue reminders
         </label>
 
-        <form
-          className="mb-4"
-          onSubmit={(event) => {
-            event.preventDefault();
-            updateMe.mutate(
-              { ntfy_topic_override: topicOverride || null },
-              { onSuccess: () => notify('Notification settings saved') },
-            );
-          }}
-        >
-          <label className="mb-1 block text-sm font-medium">ntfy topic override</label>
-          <div className="flex gap-2">
-            <input
-              className="input-base max-w-xs"
-              placeholder="Default topic when empty"
-              value={topicOverride}
-              onChange={(event) => setTopicOverride(event.target.value)}
-            />
-            <button type="submit" className="btn-secondary" disabled={updateMe.isPending}>
-              Save
-            </button>
-          </div>
-        </form>
+        <TopicOverrideForm key={me.ntfy_topic_override ?? ''} me={me} />
 
         <button
           type="button"
@@ -170,14 +184,18 @@ export function ProfilePage() {
 
         {apiToken ? (
           <div className="flex gap-2">
-            <input className="input-base font-mono text-xs" readOnly value={apiToken} />
+            <input className="input-base font-mono text-xs" aria-label="API token" readOnly value={apiToken} />
             <button
               type="button"
               className="btn-secondary"
-              onClick={() => {
-                void navigator.clipboard.writeText(apiToken);
-                notify('Token copied');
-              }}
+              onClick={() =>
+                // Clipboard access fails on plain http and in some embedded
+                // browsers; only claim success once it actually happened.
+                navigator.clipboard.writeText(apiToken).then(
+                  () => notify('Token copied'),
+                  () => notify('Copy failed: select the token and copy it manually', 'error'),
+                )
+              }
             >
               <Copy className="h-4 w-4" />
               Copy

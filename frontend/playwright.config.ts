@@ -1,4 +1,11 @@
+import { generateKeyPairSync } from 'node:crypto';
+
 import { defineConfig, devices } from '@playwright/test';
+
+// A throwaway VAPID key so the backend offers Web Push and profile.spec.ts can
+// exercise the subscription flow. The raw P-256 scalar (JWK "d") is exactly
+// the base64url form the backend expects.
+const vapidPrivateKey = generateKeyPairSync('ec', { namedCurve: 'prime256v1' }).privateKey.export({ format: 'jwk' }).d;
 
 // End-to-end tests drive the real SPA against a real backend. Playwright starts
 // both servers itself: an isolated backend on a throwaway SQLite file with the
@@ -35,11 +42,15 @@ export default defineConfig({
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
       env: {
-        SESSION_SECRET_KEY: 'e2e-test-secret-key',
+        SESSION_SECRET_KEY: 'e2e-test-secret-key-0123456789abcdef',
         SESSION_COOKIE_SECURE: 'false',
         DATABASE_URL: 'sqlite+aiosqlite:///./greenthumb-e2e.db',
         DEV_AUTH_BYPASS: 'true',
         FRONTEND_URL: 'http://localhost:5173',
+        VAPID_PRIVATE_KEY: vapidPrivateKey ?? '',
+        // Ignore a developer's .env: its real OIDC or ntfy settings must not
+        // leak into this isolated backend.
+        GREENTHUMB_ENV_FILE: '',
       },
     },
     {
